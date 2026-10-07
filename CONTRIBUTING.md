@@ -17,12 +17,15 @@ PGlite runs in-process inside Bun — no need to install PostgreSQL for developm
 
 ```
 apps/
-  web/         → Main Next.js application (POS)
-  docs/        → Documentation site (Fumadocs)
+  web/           → Main Next.js application (POS)
+  print-agent/   → Local agent that forwards ESC/POS tickets to a network printer
 packages/
-  fiscal/      → Fiscal engine (NF-e/NFC-e)
-  ui/          → Shared UI components
-  db/          → Database schema (Drizzle + PGlite/Supabase)
+  api/           → tRPC base (router, procedures, context type)
+  auth/          → Better Auth configuration
+  db/            → Database schema (Drizzle + PGlite)
+  env/           → Typed environment variables
+  event-sourcing/→ Event store, fold, and types
+  ui/            → Shared UI components
 ```
 
 ## Contribution Flow

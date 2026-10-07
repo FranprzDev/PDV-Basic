@@ -2,6 +2,9 @@ node_modules/
 .next/
 dist/
 data/
+.turbo/
+.source/
+*.tsbuildinfo
 *.log
 .env
 .env.local

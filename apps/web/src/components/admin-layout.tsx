@@ -34,16 +34,15 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { installedAddonUIs } from "@/lib/addons/installed-ui";
 
 interface NavItem {
 	href: string;
-	/** Chave no namespace "nav" (mensagens do host + addons mescladas). */
+	/** Chave no namespace "nav" das mensagens. */
 	labelKey: string;
 	icon: React.ComponentType<{ className?: string }>;
 }
 
-const coreNavItems: NavItem[] = [
+const navItems: NavItem[] = [
 	{ href: "/admin", labelKey: "dashboard", icon: LayoutDashboardIcon },
 	{ href: "/admin/cashier", labelKey: "cashier", icon: DollarSignIcon },
 	{ href: "/admin/products", labelKey: "products", icon: PackageIcon },
@@ -55,12 +54,6 @@ const coreNavItems: NavItem[] = [
 		icon: CreditCardIcon,
 	},
 	{ href: "/admin/pos", labelKey: "pos", icon: ShoppingCartIcon },
-];
-
-// Itens contribuídos pelos addons instalados (contribution point de nav)
-const navItems: NavItem[] = [
-	...coreNavItems,
-	...installedAddonUIs.flatMap((ui) => ui.nav ?? []),
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {

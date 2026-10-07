@@ -23,14 +23,6 @@ const transactionSchema = z.object({
 
 export const transactionsRouter = router({
 	list: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/transactions",
-				tags: ["Transactions"],
-				summary: "List all transactions",
-			},
-		})
 		.input(z.void())
 		.output(z.array(transactionSchema))
 		.query(async ({ ctx }) => {
@@ -38,14 +30,6 @@ export const transactionsRouter = router({
 		}),
 
 	create: protectedProcedure
-		.meta({
-			openapi: {
-				method: "POST",
-				path: "/transactions",
-				tags: ["Transactions"],
-				summary: "Create a transaction",
-			},
-		})
 		.input(
 			z.object({
 				description: z.string().min(1),
@@ -61,14 +45,6 @@ export const transactionsRouter = router({
 		}),
 
 	update: protectedProcedure
-		.meta({
-			openapi: {
-				method: "PATCH",
-				path: "/transactions/{id}",
-				tags: ["Transactions"],
-				summary: "Update a transaction",
-			},
-		})
 		.input(
 			z.object({
 				id: z.number(),
@@ -88,14 +64,6 @@ export const transactionsRouter = router({
 		}),
 
 	delete: protectedProcedure
-		.meta({
-			openapi: {
-				method: "DELETE",
-				path: "/transactions/{id}",
-				tags: ["Transactions"],
-				summary: "Delete a transaction",
-			},
-		})
 		.input(z.object({ id: z.number() }))
 		.output(z.object({ success: z.boolean() }))
 		.mutation(async ({ ctx, input }) => {

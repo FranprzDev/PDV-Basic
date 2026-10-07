@@ -1,7 +1,5 @@
-import { mergeAddonMessages } from "@finopenpos/addon-kit";
 import { cookies } from "next/headers";
 import { getRequestConfig } from "next-intl/server";
-import { installedAddons } from "@/lib/addons/installed";
 import { defaultLocale, type Locale, locales } from "./config";
 
 const messageImports = {
@@ -18,12 +16,8 @@ export default getRequestConfig(async () => {
 			? (cookieLocale as Locale)
 			: defaultLocale;
 
-	const base = (await messageImports[locale]()).default;
-	// Mescla as mensagens contribuídas pelos addons instalados
-	const messages = mergeAddonMessages(base, installedAddons, locale);
-
 	return {
 		locale,
-		messages,
+		messages: (await messageImports[locale]()).default,
 	};
 });

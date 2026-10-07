@@ -11,11 +11,6 @@ export interface ProductCreatedData {
 	in_stock: number;
 	category?: string;
 	barcode?: string;
-	ncm?: string;
-	cfop?: string;
-	icms_cst?: string;
-	pis_cst?: string;
-	cofins_cst?: string;
 	unit_of_measure?: string;
 }
 
@@ -36,11 +31,6 @@ export interface Product {
 	category: string | null;
 	barcode: string | null;
 	user_uid: string;
-	ncm: string | null;
-	cfop: string | null;
-	icms_cst: string | null;
-	pis_cst: string | null;
-	cofins_cst: string | null;
 	unit_of_measure: string | null;
 	created_at: Date;
 }
@@ -67,11 +57,6 @@ export function productReducer(
 				category: d.category ?? null,
 				barcode: d.barcode ?? null,
 				user_uid: event.userUid,
-				ncm: d.ncm ?? null,
-				cfop: d.cfop ?? null,
-				icms_cst: d.icms_cst ?? null,
-				pis_cst: d.pis_cst ?? null,
-				cofins_cst: d.cofins_cst ?? null,
 				unit_of_measure: d.unit_of_measure ?? "UN",
 				created_at: event.occurredAt,
 			};

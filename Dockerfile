@@ -5,9 +5,7 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
-COPY apps/docs/package.json ./apps/docs/
 COPY apps/print-agent/package.json ./apps/print-agent/
-COPY packages/addon-kit/package.json ./packages/addon-kit/
 COPY packages/api/package.json ./packages/api/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
@@ -21,9 +19,6 @@ FROM base AS build
 WORKDIR /app
 COPY --from=deps /app .
 COPY . .
-
-# Run postinstall scripts (fumadocs-mdx needs source files)
-RUN cd apps/docs && bunx fumadocs-mdx
 
 ENV BETTER_AUTH_SECRET=build-placeholder
 

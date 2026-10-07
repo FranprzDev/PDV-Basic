@@ -61,14 +61,8 @@ Decisões extraídas:
 
 ### Fora do escopo do event sourcing
 
-- **Domínio fiscal (NF-e/NFC-e)**: as tabelas `invoices`, `invoice_items` e
-  `invoice_events` permanecem. São o espelho de um registro externo
-  imutável (XML assinado + protocolo SEFAZ), já possuem log de eventos
-  próprio (`invoice_events`) e guardam binários (certificado A1). As
-  referências `order_id`/`product_id` agora apontam para streams do event
-  store (sem FK).
-- **`fiscal_settings`**: configuração + numeração sequencial NF-e/NFC-e.
-- **`cities`**: dados de referência IBGE.
+Nada além dos cinco domínios operacionais é event-sourced hoje. O schema
+tem apenas a tabela `events` e as tabelas de auth do Better Auth.
 
 ## Arquitetura
 

@@ -4,14 +4,6 @@ import { protectedProcedure, router } from "../init";
 
 export const dashboardRouter = router({
 	stats: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/dashboard/stats",
-				tags: ["Dashboard"],
-				summary: "Get all dashboard statistics",
-			},
-		})
 		.input(z.void())
 		.output(
 			z.object({

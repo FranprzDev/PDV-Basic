@@ -221,9 +221,6 @@ const messages: Messages = {
     limitedStock: "Apenas {count} unidades de {name} disponíveis",
     limitedUnits: "Apenas {count} unidades disponíveis",
   },
-  error: {
-    somethingWentWrong: "Desculpe, algo deu errado",
-  },
   quickActions: {
     title: "Ações rápidas",
     subtitle: "Tudo o que você precisa, a um toque de distância",

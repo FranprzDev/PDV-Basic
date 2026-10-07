@@ -20,14 +20,6 @@ const customerSchema = z.object({
 
 export const customersRouter = router({
 	list: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/customers",
-				tags: ["Customers"],
-				summary: "List all customers",
-			},
-		})
 		.input(z.void())
 		.output(z.array(customerSchema))
 		.query(async ({ ctx }) => {
@@ -35,14 +27,6 @@ export const customersRouter = router({
 		}),
 
 	create: protectedProcedure
-		.meta({
-			openapi: {
-				method: "POST",
-				path: "/customers",
-				tags: ["Customers"],
-				summary: "Create a customer",
-			},
-		})
 		.input(
 			z.object({
 				name: z.string().min(1),
@@ -57,14 +41,6 @@ export const customersRouter = router({
 		}),
 
 	update: protectedProcedure
-		.meta({
-			openapi: {
-				method: "PATCH",
-				path: "/customers/{id}",
-				tags: ["Customers"],
-				summary: "Update a customer",
-			},
-		})
 		.input(
 			z.object({
 				id: z.number(),
@@ -83,14 +59,6 @@ export const customersRouter = router({
 		}),
 
 	delete: protectedProcedure
-		.meta({
-			openapi: {
-				method: "DELETE",
-				path: "/customers/{id}",
-				tags: ["Customers"],
-				summary: "Delete a customer",
-			},
-		})
 		.input(z.object({ id: z.number() }))
 		.output(z.object({ success: z.boolean() }))
 		.mutation(async ({ ctx, input }) => {

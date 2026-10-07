@@ -18,25 +18,12 @@ const productSchema = z.object({
 	category: z.string().nullable(),
 	barcode: z.string().nullable(),
 	user_uid: z.string(),
-	ncm: z.string().nullable(),
-	cfop: z.string().nullable(),
-	icms_cst: z.string().nullable(),
-	pis_cst: z.string().nullable(),
-	cofins_cst: z.string().nullable(),
 	unit_of_measure: z.string().nullable(),
 	created_at: z.date().nullable(),
 });
 
 export const productsRouter = router({
 	list: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/products",
-				tags: ["Products"],
-				summary: "List all products",
-			},
-		})
 		.input(z.void())
 		.output(z.array(productSchema))
 		.query(async ({ ctx }) => {
@@ -44,14 +31,6 @@ export const productsRouter = router({
 		}),
 
 	create: protectedProcedure
-		.meta({
-			openapi: {
-				method: "POST",
-				path: "/products",
-				tags: ["Products"],
-				summary: "Create a product",
-			},
-		})
 		.input(
 			z.object({
 				name: z.string().min(1),
@@ -60,11 +39,6 @@ export const productsRouter = router({
 				in_stock: z.number().int().min(0),
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
-				ncm: z.string().max(8).optional(),
-				cfop: z.string().max(4).optional(),
-				icms_cst: z.string().max(3).optional(),
-				pis_cst: z.string().max(2).optional(),
-				cofins_cst: z.string().max(2).optional(),
 				unit_of_measure: z.string().max(6).optional(),
 			}),
 		)
@@ -74,14 +48,6 @@ export const productsRouter = router({
 		}),
 
 	update: protectedProcedure
-		.meta({
-			openapi: {
-				method: "PATCH",
-				path: "/products/{id}",
-				tags: ["Products"],
-				summary: "Update a product",
-			},
-		})
 		.input(
 			z.object({
 				id: z.number(),
@@ -91,11 +57,6 @@ export const productsRouter = router({
 				in_stock: z.number().int().min(0).optional(),
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
-				ncm: z.string().max(8).optional(),
-				cfop: z.string().max(4).optional(),
-				icms_cst: z.string().max(3).optional(),
-				pis_cst: z.string().max(2).optional(),
-				cofins_cst: z.string().max(2).optional(),
 				unit_of_measure: z.string().max(6).optional(),
 			}),
 		)
@@ -108,14 +69,6 @@ export const productsRouter = router({
 		}),
 
 	delete: protectedProcedure
-		.meta({
-			openapi: {
-				method: "DELETE",
-				path: "/products/{id}",
-				tags: ["Products"],
-				summary: "Delete a product",
-			},
-		})
 		.input(z.object({ id: z.number() }))
 		.output(z.object({ success: z.boolean() }))
 		.mutation(async ({ ctx, input }) => {
@@ -125,14 +78,6 @@ export const productsRouter = router({
 
 	/** Busca por código de barras escaneado. Devuelve found:false si aún no está registrado. */
 	lookup: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/products/lookup",
-				tags: ["Products"],
-				summary: "Look up a product by barcode",
-			},
-		})
 		.input(z.object({ barcode: z.string().min(1) }))
 		.output(z.object({ found: z.boolean(), product: productSchema.nullable() }))
 		.query(async ({ ctx, input }) => {

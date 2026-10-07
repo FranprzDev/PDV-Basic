@@ -42,14 +42,6 @@ const orderDetailSchema = z.object({
 
 export const ordersRouter = router({
 	get: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/orders/{id}",
-				tags: ["Orders"],
-				summary: "Get order details",
-			},
-		})
 		.input(z.object({ id: z.number() }))
 		.output(orderDetailSchema.nullable())
 		.query(async ({ ctx, input }) => {
@@ -57,14 +49,6 @@ export const ordersRouter = router({
 		}),
 
 	list: protectedProcedure
-		.meta({
-			openapi: {
-				method: "GET",
-				path: "/orders",
-				tags: ["Orders"],
-				summary: "List all orders",
-			},
-		})
 		.input(z.void())
 		.output(z.array(orderWithCustomerSchema))
 		.query(async ({ ctx }) => {
@@ -72,14 +56,6 @@ export const ordersRouter = router({
 		}),
 
 	create: protectedProcedure
-		.meta({
-			openapi: {
-				method: "POST",
-				path: "/orders",
-				tags: ["Orders"],
-				summary: "Create an order with items",
-			},
-		})
 		.input(
 			z.object({
 				customerId: z.number().nullable().optional(),
@@ -109,14 +85,6 @@ export const ordersRouter = router({
 		}),
 
 	update: protectedProcedure
-		.meta({
-			openapi: {
-				method: "PATCH",
-				path: "/orders/{id}",
-				tags: ["Orders"],
-				summary: "Update an order",
-			},
-		})
 		.input(
 			z.object({
 				id: z.number(),
@@ -133,14 +101,6 @@ export const ordersRouter = router({
 		}),
 
 	delete: protectedProcedure
-		.meta({
-			openapi: {
-				method: "DELETE",
-				path: "/orders/{id}",
-				tags: ["Orders"],
-				summary: "Delete an order and its items",
-			},
-		})
 		.input(z.object({ id: z.number() }))
 		.output(z.object({ success: z.boolean() }))
 		.mutation(async ({ ctx, input }) => {

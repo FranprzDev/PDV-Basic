@@ -15,9 +15,8 @@ para el mercado local.
 
 ## Lo que no incluye
 
-El módulo fiscal es **brasileño** (NF-e / SEFAZ) y viene sin usar ni compilar limpio. Para
-Argentina hay que reemplazarlo por AFIP/ARCA. No es necesario para operar: se puede vender sin
-facturación y agregarla después.
+No incluye facturación electrónica. Para facturar en Argentina hay que sumar AFIP/ARCA, que es
+un desarrollo aparte. No es necesario para operar: se vende sin facturar y se agrega después.
 
 ## Arranque
 
@@ -26,8 +25,7 @@ bun install
 bun run dev
 ```
 
-- App: http://localhost:3001
-- Documentación: http://localhost:3002
+App en http://localhost:3001
 
 Usuario de prueba: `test@example.com` / `test1234`
 

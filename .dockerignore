@@ -5,7 +5,5 @@ drizzle
 .env
 .env*.local
 .git
-.claude
 .playwright-mcp
-.reference
 .turbo
