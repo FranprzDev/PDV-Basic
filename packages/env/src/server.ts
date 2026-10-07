@@ -18,6 +18,6 @@ const base = env.BASE_URL.replace(/\/$/, "");
 const isDev = base === "http://localhost";
 
 export const serverUrls = {
-  betterAuthUrl: isDev ? "http://localhost:3001" : `${base}/app`,
-  landingUrl: isDev ? undefined : base,
+  betterAuthUrl: isDev ? "http://localhost:3001" : base,
+  landingUrl: base,
 } as const;

@@ -42,20 +42,6 @@ function MiniTerminal() {
 	);
 }
 
-function MiniCode() {
-	return (
-		<div className="mt-4 overflow-hidden rounded-md border border-[#1a1a1a] bg-[#0A0A0B] p-3 font-mono text-[10px] leading-relaxed">
-			<span className="text-[#34D59A]">await</span>{" "}
-			<span className="text-[#C9CBCF]">sefaz.</span>
-			<span className="text-[#F7B983]">authorize</span>
-			<span className="text-[#94979E]">(</span>
-			<span className="text-[#C9CBCF]">nfce</span>
-			<span className="text-[#94979E]">)</span>
-			<br />
-			<span className="text-[#64676F]">// status: 100 - Autorizada</span>
-		</div>
-	);
-}
 
 function MiniChart() {
 	return (
@@ -147,7 +133,6 @@ export default function Features() {
 								</p>
 							</div>
 							{visual === "terminal" && <MiniTerminal />}
-							{visual === "code" && <MiniCode />}
 							{visual === "chart" && <MiniChart />}
 						</BentoCard>
 					))}

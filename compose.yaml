@@ -2,15 +2,26 @@ services:
   app:
     build: .
     environment:
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BASE_URL=${BASE_URL:-http://localhost}
-      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost}
-      - PORT=3111
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?definí BETTER_AUTH_SECRET en un .env}
+      - BASE_URL=${BASE_URL:-http://localhost:3111}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3111}
     ports:
       - "3111:3111"
     volumes:
       - pglite_data:/app/apps/web/data/pglite
     restart: unless-stopped
+
+  # Agente de impresion: corre en la maquina del local y llega a la impresora
+  # por la red de la tienda. Sin esto, una impresora USB o de red no se puede
+  # usar desde el navegador.
+  #   docker compose run --rm print-agent --host 192.168.1.50
+  print-agent:
+    build: .
+    profiles: ["tools"]
+    entrypoint: ["bun", "run", "src/index.ts"]
+    working_dir: /app/apps/print-agent
+    command: ["--help"]
+    network_mode: host
 
 volumes:
   pglite_data:

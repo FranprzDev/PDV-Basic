@@ -59,10 +59,17 @@ ticket, es que falta eso.
 ## Publicar
 
 ```bash
+cp .env.example .env    # y poné un BETTER_AUTH_SECRET
 docker compose up -d
 ```
 
-Un contenedor, un volumen de datos. Alcanza para los primeros 50 comercios en un VPS de ~5 EUR/mes.
+Queda en http://localhost:3111. Un contenedor, un volumen de datos.
+
+La impresora se conecta desde la máquina del local:
+
+```bash
+docker compose run --rm print-agent --host 192.168.1.50
+```
 
 ## Licencia
 
