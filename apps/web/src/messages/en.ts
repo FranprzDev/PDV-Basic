@@ -271,24 +271,6 @@ const messages = {
     cutAfterPrint: "Cut paper after printing",
     codePage: "Code page (accents)",
   },
-  credit: {
-    title: "Customer credit",
-    subtitle: "Track what your customers owe you",
-    newCharge: "New charge",
-    newPayment: "Record payment",
-    balance: "Balance",
-    outstanding: "Outstanding",
-    settled: "Settled",
-    noOutstanding: "No customer owes you anything",
-    amount: "Amount",
-    note: "Note",
-    chargeCreated: "Charge recorded",
-    paymentRecorded: "Payment recorded",
-    statement: "Statement",
-    statementSent: "Statement link sent to the customer",
-    sendStatement: "Send statement",
-    insufficient: "Payment exceeds the balance",
-  },
 } as const;
 
 export default messages;

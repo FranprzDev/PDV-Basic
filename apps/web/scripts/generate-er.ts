@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { getTableName } from "drizzle-orm";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import * as schema from "../src/lib/db/schema";
@@ -92,6 +92,12 @@ function detectMarkerStyle(content: string): keyof typeof MARKERS | null {
 }
 
 function injectIntoFile(filePath: string, mermaid: string) {
+	// Los README son opcionales: un doc ausente no debe frenar el arranque.
+	if (!existsSync(filePath)) {
+		console.warn(`File not found, skipping: ${filePath}`);
+		return;
+	}
+
 	const content = readFileSync(filePath, "utf-8");
 	const style = detectMarkerStyle(content);
 

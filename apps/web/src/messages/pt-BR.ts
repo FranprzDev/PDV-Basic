@@ -273,24 +273,6 @@ const messages: Messages = {
     cutAfterPrint: "Cortar o papel após imprimir",
     codePage: "Página de códigos (acentos)",
   },
-  credit: {
-    title: "Crédito de clientes",
-    subtitle: "Acompanhe quem te deve e quanto",
-    newCharge: "Novo débito",
-    newPayment: "Registrar pagamento",
-    balance: "Saldo",
-    outstanding: "Em aberto",
-    settled: "Quitado",
-    noOutstanding: "Nenhum cliente te deve nada",
-    amount: "Valor",
-    note: "Observação",
-    chargeCreated: "Débito registrado",
-    paymentRecorded: "Pagamento registrado",
-    statement: "Extrato",
-    statementSent: "Link do extrato enviado ao cliente",
-    sendStatement: "Enviar extrato",
-    insufficient: "O pagamento é maior que o saldo",
-  },
 } as const;
 
 export default messages;
