@@ -48,6 +48,7 @@ export default function Products() {
     description: z.string(),
     price: z.number().min(0, t("priceMustBePositive")),
     in_stock: z.number().int().min(0, t("stockMustBeNonNegative")),
+    barcode: z.string(),
     category: z.string(),
     ncm: z.string(),
     cfop: z.string(),
@@ -88,6 +89,7 @@ export default function Products() {
     { key: "description", header: tc("description"), getValue: (p) => p.description ?? "" },
     { key: "price", header: tc("price"), getValue: (p) => (p.price / 100).toFixed(2) },
     { key: "in_stock", header: t("stock"), getValue: (p) => p.in_stock },
+    { key: "barcode", header: t("barcode"), getValue: (p) => p.barcode ?? "" },
     { key: "category", header: tc("category"), getValue: (p) => p.category ?? "" },
   ];
 
@@ -126,7 +128,7 @@ export default function Products() {
   });
 
   const form = useForm({
-    defaultValues: { name: "", description: "", price: 0, in_stock: 0, category: "", ncm: "", cfop: "", icms_cst: "", pis_cst: "", cofins_cst: "", unit_of_measure: "" },
+    defaultValues: { name: "", description: "", price: 0, in_stock: 0, barcode: "", category: "", ncm: "", cfop: "", icms_cst: "", pis_cst: "", cofins_cst: "", unit_of_measure: "" },
     validators: {
       onSubmit: productFormSchema,
     },
@@ -136,6 +138,7 @@ export default function Products() {
         description: value.description || undefined,
         price: Math.round(value.price * 100),
         in_stock: value.in_stock,
+        barcode: value.barcode || undefined,
         category: value.category || undefined,
         ncm: value.ncm || undefined,
         cfop: value.cfop || undefined,
@@ -174,6 +177,7 @@ export default function Products() {
     form.setFieldValue("description", p.description ?? "");
     form.setFieldValue("price", p.price / 100);
     form.setFieldValue("in_stock", p.in_stock);
+    form.setFieldValue("barcode", p.barcode ?? "");
     form.setFieldValue("category", p.category ?? "");
     form.setFieldValue("ncm", p.ncm ?? "");
     form.setFieldValue("cfop", p.cfop ?? "");
@@ -314,6 +318,24 @@ export default function Products() {
                         onBlur={field.handleBlur}
                         error={field.state.meta.errors.length > 0 ? field.state.meta.errors.map(e => e?.message ?? e).join(", ") : undefined}
                       />
+                    </div>
+                  </div>
+                )}
+              </form.Field>
+              <form.Field name="barcode">
+                {(field) => (
+                  <div className="flex flex-col sm:grid sm:grid-cols-4 sm:items-center gap-2 sm:gap-4">
+                    <Label htmlFor="barcode" className="sm:text-right">{t("barcode")}</Label>
+                    <div className="col-span-3">
+                      <Input
+                        id="barcode"
+                        placeholder="7798145678903"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        error={field.state.meta.errors.length > 0 ? field.state.meta.errors.map(e => e?.message ?? e).join(", ") : undefined}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">{t("barcodeHint")}</p>
                     </div>
                   </div>
                 )}

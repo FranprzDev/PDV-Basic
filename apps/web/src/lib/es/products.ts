@@ -1,5 +1,6 @@
 import type { DomainEvent, StoredEvent } from "@finopenpos/event-sourcing";
 import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
+import { findByBarcode } from "@/lib/scanner/barcode";
 import { eventStore, STREAM } from "./store";
 
 // ── Eventos ─────────────────────────────────────────────────────────────────
@@ -112,19 +113,12 @@ export async function loadProduct(
 
 // ── Consultas ────────────────────────────────────────────────────────────────
 
-/** Normaliza un código escaneado para comparar (los lectores agregan ceros y espacios). */
-export function normalizeBarcode(raw: string): string {
-	return raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-}
-
 export async function findProductByBarcode(
 	userUid: string,
 	barcode: string,
 ): Promise<Product | undefined> {
-	const normalized = normalizeBarcode(barcode);
-	if (!normalized) return undefined;
 	const products = await listProducts(userUid);
-	return products.find((p) => p.barcode && normalizeBarcode(p.barcode) === normalized);
+	return findByBarcode(products, barcode);
 }
 
 // ── Comandos ────────────────────────────────────────────────────────────────

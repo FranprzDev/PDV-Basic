@@ -14,7 +14,7 @@ import { Combobox } from "@finopenpos/ui/components/combobox";
 import { Button } from "@finopenpos/ui/components/button";
 import { Input } from "@finopenpos/ui/components/input";
 import { Badge } from "@finopenpos/ui/components/badge";
-import { Loader2Icon, MinusIcon, PlusIcon, SearchIcon, Trash2Icon, ReceiptTextIcon } from "lucide-react";
+import { Loader2Icon, MinusIcon, PlusIcon, SearchIcon, Trash2Icon, ReceiptTextIcon, PrinterIcon, ScanBarcodeIcon } from "lucide-react";
 import { Skeleton } from "@finopenpos/ui/components/skeleton";
 import { toast } from "sonner";
 import { useTRPC } from "@/lib/trpc/client";
@@ -22,6 +22,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { RouterOutputs } from "@/lib/trpc/router";
 import { useTranslations, useLocale } from "next-intl";
 import { formatCurrency } from "@/lib/utils";
+import { useBarcodeScanner } from "@/lib/scanner/use-barcode-scanner";
+import { findByBarcode } from "@/lib/scanner/barcode";
+import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
 
 type Product = RouterOutputs["products"]["list"][number];
 type POSProduct = Pick<Product, "id" | "name" | "price" | "in_stock"> & { category: string; quantity: number };
@@ -38,24 +41,93 @@ export default function POSPage() {
   const locale = useLocale();
 
   const loading = loadingProducts || loadingCustomers || loadingMethods;
-
-  const createOrderMutation = useMutation(trpc.orders.create.mutationOptions({
-    onSuccess: () => {
-      queryClient.invalidateQueries(trpc.orders.list.queryOptions());
-      queryClient.invalidateQueries(trpc.products.list.queryOptions());
-      toast.success(tOrders("createdSuccessfully"));
-      setSelectedProducts([]);
-      setSelectedCustomer(null);
-      setPaymentMethod(null);
-    },
-    onError: (err) => toast.error(err.message || tOrders("createError")),
-  }));
+  const tScanner = useTranslations("scanner");
+  const { print: printTicket, isPrinting } = useTicketPrinter();
 
   const [selectedProducts, setSelectedProducts] = useState<POSProduct[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<{ id: number; name: string } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<{ id: number; name: string } | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [emitNfce, setEmitNfce] = useState(false);
+  const [lastScan, setLastScan] = useState<{ code: string; name?: string } | null>(null);
+
+  const addToCart = React.useCallback(
+    (product: Product) => {
+      if (product.in_stock <= 0) {
+        toast.error(t("outOfStock", { name: product.name }));
+        return;
+      }
+      setSelectedProducts((prev) => {
+        const existing = prev.find((p) => p.id === product.id);
+        if (!existing) {
+          return [
+            ...prev,
+            {
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              in_stock: product.in_stock,
+              category: product.category ?? "",
+              quantity: 1,
+            },
+          ];
+        }
+        if (existing.quantity >= product.in_stock) {
+          toast.error(t("limitedStock", { count: product.in_stock, name: product.name }));
+          return prev;
+        }
+        return prev.map((p) =>
+          p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p,
+        );
+      });
+    },
+    [t],
+  );
+
+  // La pistola suma al carrito contra la lista ya en memoria: sin ida y vuelta al servidor.
+  useBarcodeScanner({
+    enabled: !loading,
+    onScan: (code) => {
+      const product = findByBarcode(products, code);
+      if (product) {
+        addToCart(product);
+        setLastScan({ code, name: product.name });
+      } else {
+        setLastScan({ code });
+        toast.error(tScanner("notFound", { code }), {
+          description: tScanner("notFoundHint"),
+        });
+      }
+    },
+  });
+
+  const createOrderMutation = useMutation(
+    trpc.orders.create.mutationOptions({
+      onSuccess: (order) => {
+        queryClient.invalidateQueries(trpc.orders.list.queryOptions());
+        queryClient.invalidateQueries(trpc.products.list.queryOptions());
+        toast.success(tOrders("createdSuccessfully"));
+
+        void printTicket({
+          businessName: "Mi Negocio",
+          receiptNumber: String(order?.id ?? Date.now()),
+          items: selectedProducts.map((p) => ({
+            name: p.name,
+            quantity: p.quantity,
+            unitPrice: p.price,
+          })),
+          paymentMethod: paymentMethod?.name ?? "",
+          customerName: selectedCustomer?.name,
+          date: new Date(),
+        });
+
+        setSelectedProducts([]);
+        setSelectedCustomer(null);
+        setPaymentMethod(null);
+      },
+      onError: (err) => toast.error(err.message || tOrders("createError")),
+    }),
+  );
 
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return products;
@@ -193,6 +265,25 @@ export default function POSPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("products")}</CardTitle>
+          {lastScan && (
+            <div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs">
+              <ScanBarcodeIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-mono">{lastScan.code}</span>
+              {lastScan.name ? (
+                <span className="text-muted-foreground">→ {lastScan.name}</span>
+              ) : (
+                <span className="text-destructive">{tScanner("notFoundHint")}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setLastScan(null)}
+                className="ml-auto text-muted-foreground hover:text-foreground"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row gap-3 !mt-4">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -308,7 +399,11 @@ export default function POSPage() {
                 size="lg"
                 className="flex-1 sm:flex-initial"
               >
-                {createOrderMutation.isPending && <Loader2Icon className="h-4 w-4 animate-spin mr-2" />}
+                {createOrderMutation.isPending ? (
+                  <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                ) : isPrinting ? (
+                  <PrinterIcon className="h-4 w-4 mr-2" />
+                ) : null}
                 {t("createOrder")}
               </Button>
             </div>
