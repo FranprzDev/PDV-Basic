@@ -15,35 +15,37 @@
  *   1C 50 n      página de códigos (858 = español con acentos)
  */
 
-/** Tabla CP858 (Euro + español). Los lectores térmicos vienen en CP437, sin ñ/á/é. */
+/**
+ * Tabla CP858 (Euro + español). Es CP850 con el euro agregado en 0xD5.
+ *
+ * Ojo: NO es igual a Latin-1. En Latin-1 la á es 0xE1; en CP858 la á es 0xA0.
+ * Escribir el byte de Latin-1 produce otra letra en el papel. Por eso existe
+ * esta tabla y no alcanza con pasar el codePoint.
+ */
 const CP858_HIGH: Record<string, number> = {
+	// 0x80 - 0x8F
+	"Ç": 0x80, "ü": 0x81, "é": 0x82, "â": 0x83, "ä": 0x84, "à": 0x85,
+	"å": 0x86, "ç": 0x87, "ê": 0x88, "ë": 0x89, "è": 0x8a, "ï": 0x8b,
+	"î": 0x8c, "ì": 0x8d, "Ä": 0x8e, "Å": 0x8f,
+	// 0x90 - 0x9F
+	"É": 0x90, "æ": 0x91, "Æ": 0x92, "ô": 0x93, "ö": 0x94, "ò": 0x95,
+	"û": 0x96, "ù": 0x97, "ÿ": 0x98, "Ö": 0x99, "Ü": 0x9a, "ø": 0x9b,
+	"£": 0x9c, "Ø": 0x9d, "×": 0x9e, "ƒ": 0x9f,
+	// 0xA0 - 0xAF — los que importan en español
+	"á": 0xa0, "í": 0xa1, "ó": 0xa2, "ú": 0xa3, "ñ": 0xa4, "Ñ": 0xa5,
+	"ª": 0xa6, "º": 0xa7, "¿": 0xa8, "®": 0xa9, "¬": 0xaa,
+	"½": 0xab, "¼": 0xac, "¡": 0xad, "«": 0xae, "»": 0xaf,
+	// 0xD5 es el euro en CP858
 	"€": 0xd5,
-	"‚": 0x82,
-	"ƒ": 0x83,
-	"„": 0x84,
-	"…": 0x85,
-	"†": 0x86,
-	"‡": 0x87,
-	"ˆ": 0x88,
-	"‰": 0x89,
-	"Š": 0x8a,
-	"‹": 0x8b,
-	"Œ": 0x8c,
-	"Ž": 0x8e,
-	"‘": 0x91,
-	"’": 0x92,
-	"“": 0x93,
-	"”": 0x94,
-	"•": 0x95,
-	"–": 0x96,
-	"—": 0x97,
-	"˜": 0x98,
-	"™": 0x99,
-	"š": 0x9a,
-	"›": 0x9b,
-	"œ": 0x9c,
-	"ž": 0x9e,
-	"Ÿ": 0x9f,
+	// 0xF8 - 0xFB
+	"°": 0xf8, "ß": 0xf9, "ã": 0xfa, "õ": 0xfb,
+};
+
+/** Mayúsculas acentuadas que CP858 no tiene: se les saca el acento. */
+const STRIP_ACCENT: Record<string, string> = {
+	"Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U",
+	"À": "A", "È": "E", "Ì": "I", "Ò": "O", "Ù": "U",
+	"Â": "A", "Ê": "E", "Î": "I", "Ô": "O", "Û": "U",
 };
 
 export type Alignment = "left" | "center" | "right";
@@ -103,23 +105,31 @@ export class EscPosEncoder {
 		return this.command(0x1d, 0x56, 0x00);
 	}
 
-	/** Convierte texto a bytes en la página de códigos activa. */
+	/** Convierte texto a bytes CP858. */
 	text(value: string): this {
 		for (const char of value) {
-			const high = CP858_HIGH[char];
-			if (high !== undefined) {
-				this.bytes.push(high);
-				continue;
-			}
 			const code = char.codePointAt(0) ?? 0x20;
+
 			if (code < 0x80) {
 				this.bytes.push(code);
-			} else if (code <= 0xff) {
-				this.bytes.push(code);
-			} else {
-				// Emoji o caracteres fuera de la tabla: se reemplaza por '?'
-				this.bytes.push(0x3f);
+				continue;
 			}
+
+			const mapped = CP858_HIGH[char];
+			if (mapped !== undefined) {
+				this.bytes.push(mapped);
+				continue;
+			}
+
+			// CP858 no cubre mayúsculas acentuadas ni emoji: se degrada en vez
+			// de escribir un byte que en el papel sería otra letra.
+			const stripped = STRIP_ACCENT[char];
+			if (stripped) {
+				this.text(stripped);
+				continue;
+			}
+
+			this.bytes.push(0x3f); // '?'
 		}
 		return this;
 	}
