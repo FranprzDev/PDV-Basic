@@ -25,7 +25,7 @@ export {
 // orders, transactions, payment methods). Todo estado é reconstruído por
 // replay dos eventos — não existem snapshots nem tabelas de estado.
 //
-// Tabelas de addons (ex.: fiscal) são contribuídas pelos próprios addons
+// Tabelas de addons (ex.: un addon) são contribuídas pelos próprios addons
 // e compostas pelo host — ver apps/web/src/lib/addons.
 //
 // Decisões de design (ver packages/event-sourcing/bench e docs/adr):

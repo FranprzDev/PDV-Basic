@@ -15,12 +15,12 @@ const messages = {
 		title: "The open-source POS",
 		titleAccent: "you deserve",
 		subtitle:
-			"A complete point-of-sale system with fiscal integration, built by developers, for everyone. Free, transparent, and community-driven.",
+			"A complete point-of-sale system with barcode scanning and thermal printing, built by developers, for everyone. Free, transparent, and community-driven.",
 		cta: "View on GitHub",
 		ctaSecondary: "Read the Docs",
 	},
 	problem: {
-		text: "Most small businesses can't afford expensive POS systems with fiscal compliance. The few open-source alternatives are outdated, poorly maintained, and lack <highlight>real tax and invoice integration</highlight>. We're changing that.",
+		text: "Most small businesses can't afford expensive POS systems. The few open-source alternatives are outdated, poorly maintained, and lack <highlight>working hardware support</highlight>. We're changing that.",
 		count: "small businesses worldwide",
 	},
 	techStack: {
@@ -62,11 +62,6 @@ const messages = {
 			name: "Point of Sale",
 			description:
 				"Fast, intuitive checkout. Works offline with PGLite. Supports multiple payment methods.",
-		},
-		fiscal: {
-			name: "Fiscal Integration",
-			description:
-				"Complete tax document and invoice support. Government API communication, digital certificates, document generation.",
 		},
 		multiTenant: {
 			name: "Multi-Tenancy",

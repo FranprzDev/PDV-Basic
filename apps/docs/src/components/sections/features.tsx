@@ -19,7 +19,6 @@ const features = [
 		span: "md:col-span-2",
 		visual: "terminal",
 	},
-	{ key: "fiscal", icon: FileText, span: "", visual: "code" },
 	{ key: "multiTenant", icon: Users, span: "", visual: null },
 	{ key: "offline", icon: Database, span: "", visual: null },
 	{ key: "dashboard", icon: BarChart3, span: "", visual: "chart" },

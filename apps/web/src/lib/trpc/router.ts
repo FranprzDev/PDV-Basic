@@ -1,5 +1,4 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import { addonRouters } from "@/lib/addons/installed";
 import { router } from "./init";
 import { customersRouter } from "./routers/customers";
 import { dashboardRouter } from "./routers/dashboard";
@@ -15,8 +14,6 @@ export const appRouter = router({
 	transactions: transactionsRouter,
 	paymentMethods: paymentMethodsRouter,
 	dashboard: dashboardRouter,
-	// Routers contribuídos pelos addons instalados (fiscal, ...)
-	...addonRouters,
 });
 
 export type AppRouter = typeof appRouter;

@@ -15,12 +15,12 @@ const messages = {
 		title: "O PDV open-source que o",
 		titleAccent: "Brasil merece",
 		subtitle:
-			"Um sistema completo de ponto de venda com integração fiscal, construído por desenvolvedores, para todos. Gratuito, transparente e movido pela comunidade.",
+			"Um sistema completo de ponto de venda com leitura de código de barras e impressão térmica, construído por desenvolvedores, para todos. Gratuito, transparente e movido pela comunidade.",
 		cta: "Ver no GitHub",
 		ctaSecondary: "Ler a Documentação",
 	},
 	problem: {
-		text: "A maioria não pode pagar por sistemas de PDV caros com conformidade fiscal. As poucas alternativas open-source são desatualizadas, mal mantidas e não têm <highlight>integração real com NF-e e NFC-e</highlight>. Estamos mudando isso.",
+		text: "A maioria não pode pagar por sistemas de PDV caros. As poucas alternativas open-source são desatualizadas, mal mantidas e não têm <highlight>suporte a hardware funcionando</highlight>. Estamos mudando isso.",
 		count: "pequenas empresas no Brasil",
 	},
 	techStack: {
@@ -62,11 +62,6 @@ const messages = {
 			name: "Ponto de Venda",
 			description:
 				"Checkout rápido e intuitivo. Funciona offline com PGLite. Suporta múltiplos métodos de pagamento.",
-		},
-		fiscal: {
-			name: "Integração Fiscal",
-			description:
-				"Suporte completo a NF-e e NFC-e. Comunicação SEFAZ, certificados digitais, geração de DANFE.",
 		},
 		multiTenant: {
 			name: "Multi-Tenancy",

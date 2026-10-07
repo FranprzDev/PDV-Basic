@@ -23,7 +23,7 @@ import type { PgTable } from "drizzle-orm/pg-core";
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 export interface AddonManifest {
-	/** Identificador único, kebab-case (ex.: "fiscal"). */
+	/** Identificador único, kebab-case (ex.: "mi-addon"). */
 	id: string;
 	name: string;
 	version: string;

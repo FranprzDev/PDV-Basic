@@ -3,13 +3,14 @@ import { getTableName } from "drizzle-orm";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import * as schema from "../src/lib/db/schema";
 
-// Tables in display order — operational domains live in the event store
-const TABLES: PgTable[] = [
-	schema.events,
-	schema.invoices,
-	schema.invoiceItems,
-	schema.invoiceEvents,
-];
+// Tables in display order — operational domains live in the event store.
+// Se filtran los que no existan: las tablas de los addons solo aparecen si el
+// addon está instalado, y este script corre antes de arrancar la app.
+const CANDIDATE_TABLES = [schema.events, schema.invoices, schema.invoiceItems, schema.invoiceEvents];
+
+const TABLES: PgTable[] = CANDIDATE_TABLES.filter(
+	(table): table is PgTable => Boolean(table),
+);
 
 const SQL_TYPE_MAP: Record<string, string> = {
 	serial: "serial",

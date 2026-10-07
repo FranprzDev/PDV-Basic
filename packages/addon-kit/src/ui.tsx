@@ -8,7 +8,7 @@
  *    mescladas pelo host — namespace "nav").
  *  - `pages`: páginas montadas pelo host numa rota catch-all sob /admin.
  *    Padrões suportados: segmentos literais e parâmetros ":nome"
- *    (ex.: "fiscal", "fiscal/settings", "fiscal/:id").
+ *    (ex.: "mi-addon", "fiscal/settings", "mi-addon/:id").
  *
  * Serviços do host chegam via <AddonServicesProvider> (injeção de
  * dependência): o addon usa `useAddonTRPC<MeuRouter>()` para acessar o
@@ -34,7 +34,7 @@ export interface AddonPageProps {
 }
 
 export interface AddonPage {
-	/** Caminho relativo a /admin — ex.: "fiscal", "fiscal/:id". */
+	/** Caminho relativo a /admin — ex.: "mi-addon", "mi-addon/:id". */
 	pattern: string;
 	component: ComponentType<AddonPageProps>;
 }

@@ -2,9 +2,9 @@
 
 /**
  * Registro de addons instalados (lado cliente).
- * Contribuições de UI: itens de navegação do admin e páginas sob /admin.
+ * Contribuciones de UI: ítems de navegación y páginas bajo /admin.
  */
-import { fiscalAddonUI } from "@finopenpos/addon-fiscal/ui";
+
 import type { AddonUIDefinition } from "@finopenpos/addon-kit/ui";
 
-export const installedAddonUIs: readonly AddonUIDefinition[] = [fiscalAddonUI];
+export const installedAddonUIs: readonly AddonUIDefinition[] = [];

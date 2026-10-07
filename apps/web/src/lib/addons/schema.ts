@@ -1,5 +1,8 @@
 /**
- * Composição de schema dos addons instalados — re-exportado pelo schema do
- * app para que o drizzle-kit gere/aplique as tabelas contribuídas.
+ * Composicion de schema de los addons instalados, reexportada por el schema del
+ * app para que drizzle-kit genere y aplique las tablas contribuidas.
+ *
+ * Vacio a proposito: no hay ningun addon activo.
  */
-export * from "@finopenpos/addon-fiscal/schema";
+
+export {};

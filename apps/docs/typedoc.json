@@ -1,8 +1,11 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["../../packages/fiscal/src/index.ts"],
+  "entryPoints": [],
   "tsconfig": "../../packages/fiscal/tsconfig.json",
-  "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-frontmatter"],
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "typedoc-plugin-frontmatter"
+  ],
   "out": "content/docs/api-reference",
   "readme": "none",
   "entryFileName": "index",
@@ -26,7 +29,10 @@
   "excludeInternal": true,
   "excludeExternals": true,
   "categorizeByGroup": true,
-  "sort": ["kind", "alphabetical"],
+  "sort": [
+    "kind",
+    "alphabetical"
+  ],
   "kindSortOrder": [
     "Function",
     "Class",
