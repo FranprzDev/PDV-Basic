@@ -1,5 +1,6 @@
 
 const localeCurrencyMap: Record<string, string> = {
+  es: "ARS",
   en: "USD",
   "pt-BR": "BRL",
 };

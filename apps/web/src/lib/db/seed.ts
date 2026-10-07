@@ -10,6 +10,7 @@ import {
 	type TransactionEvent,
 } from "@/lib/es";
 import { auth } from "../auth";
+import { catalogo } from "./catalogo-almacen";
 import { db } from ".";
 
 const DEMO_EMAIL = "test@example.com";
@@ -44,7 +45,7 @@ export async function seed() {
 
 	// ── Payment Methods ──────────────────────────────────────────────────────
 	const paymentMethodIds: number[] = [];
-	for (const name of ["Credit Card", "Debit Card", "Cash"]) {
+	for (const name of ["Efectivo", "Tarjeta de débito", "Tarjeta de crédito", "Transferencia", "Mercado Pago"]) {
 		const id = await eventStore.nextStreamId(STREAM.paymentMethod);
 		await eventStore.append<PaymentMethodEvent>({
 			streamType: STREAM.paymentMethod,
@@ -87,74 +88,30 @@ export async function seed() {
 	}
 
 	// ── Products ─────────────────────────────────────────────────────────────
-	const productNames: Record<string, string[]> = {
-		electronics: [
-			"Wireless Mouse",
-			"Mechanical Keyboard",
-			"USB-C Hub",
-			"Webcam HD",
-			"Bluetooth Speaker",
-			"Phone Charger",
-			"Laptop Stand",
-			"LED Monitor",
-		],
-		clothing: [
-			"Cotton T-Shirt",
-			"Denim Jeans",
-			"Hoodie",
-			"Baseball Cap",
-			"Running Shoes",
-			"Wool Socks",
-			"Leather Belt",
-			"Rain Jacket",
-		],
-		books: [
-			"The Pragmatic Programmer",
-			"Clean Code",
-			"Design Patterns",
-			"Refactoring",
-			"Domain-Driven Design",
-			"The Mythical Man-Month",
-			"JavaScript: The Good Parts",
-			"Learning SQL",
-		],
-		home: [
-			"Ceramic Mug",
-			"Desk Lamp",
-			"Wall Clock",
-			"Throw Pillow",
-			"Kitchen Scale",
-			"Glass Vase",
-			"Bath Towel Set",
-			"Scented Candle",
-		],
-	};
-
 	const seededProducts: { id: number; price: number }[] = [];
-	for (const [category, names] of Object.entries(productNames)) {
-		for (const name of names) {
-			const id = await eventStore.nextStreamId(STREAM.product);
-			const price = faker.number.int({ min: 499, max: 29999 });
-			await eventStore.append<ProductEvent>({
-				streamType: STREAM.product,
-				streamId: id,
-				expectedVersion: 0,
-				userUid: userId,
-				events: [
-					{
-						type: "ProductCreated",
-						data: {
-							name,
-							description: faker.commerce.productDescription(),
-							price,
-							in_stock: faker.number.int({ min: 0, max: 200 }),
-							category,
-						},
+	for (const item of catalogo()) {
+		const id = await eventStore.nextStreamId(STREAM.product);
+		await eventStore.append<ProductEvent>({
+			streamType: STREAM.product,
+			streamId: id,
+			expectedVersion: 0,
+			userUid: userId,
+			events: [
+				{
+					type: "ProductCreated",
+					data: {
+						name: item.nombre,
+						description: "",
+						price: item.precio,
+						in_stock: item.stock,
+						barcode: item.barcode,
+						category: item.categoria,
+						unit_of_measure: item.unidad,
 					},
-				],
-			});
-			seededProducts.push({ id, price });
-		}
+				},
+			],
+		});
+		seededProducts.push({ id, price: item.precio });
 	}
 
 	// ── Orders + Selling Transactions ────────────────────────────────────────
