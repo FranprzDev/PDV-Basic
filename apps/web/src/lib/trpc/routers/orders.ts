@@ -82,7 +82,7 @@ export const ordersRouter = router({
 		})
 		.input(
 			z.object({
-				customerId: z.number(),
+				customerId: z.number().nullable().optional(),
 				paymentMethodId: z.number(),
 				products: z.array(
 					z.object({
@@ -97,7 +97,7 @@ export const ordersRouter = router({
 		.output(orderWithCustomerSchema)
 		.mutation(async ({ ctx, input }) => {
 			return placeOrder(ctx.user.id, {
-				customerId: input.customerId,
+				customerId: input.customerId ?? null,
 				paymentMethodId: input.paymentMethodId,
 				products: input.products.map((p) => ({
 					product_id: p.id,

@@ -158,7 +158,8 @@ export async function loadOrder(
 
 // ── Comandos ────────────────────────────────────────────────────────────────
 export interface PlaceOrderInput {
-	customerId: number;
+	/** null en compra de mostrador, sin cliente registrado. */
+	customerId: number | null;
 	paymentMethodId: number;
 	products: OrderItemData[];
 	total: number;

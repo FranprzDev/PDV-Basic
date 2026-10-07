@@ -221,7 +221,8 @@ const messages: Messages = {
   },
   pos: {
     saleDetails: "Detalle de la venta",
-    selectCustomer: "Seleccionar cliente",
+    selectCustomer: "Seleccionar cliente (opcional)",
+    walkIn: "Compra de mostrador (sin nombre)",
     selectPaymentMethod: "Seleccionar método de pago",
     products: "Productos",
     searchPlaceholder: "Buscar productos...",

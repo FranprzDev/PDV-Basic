@@ -213,7 +213,8 @@ const messages = {
   },
   pos: {
     saleDetails: "Sale Details",
-    selectCustomer: "Select Customer",
+    selectCustomer: "Select customer (optional)",
+    walkIn: "Walk-in customer (no name)",
     selectPaymentMethod: "Select Payment Method",
     products: "Products",
     searchPlaceholder: "Search products...",

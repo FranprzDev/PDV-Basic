@@ -38,6 +38,7 @@ export default function POSPage() {
   const t = useTranslations("pos");
   const tc = useTranslations("common");
   const tOrders = useTranslations("orders");
+  const ts = useTranslations("pos");
   const locale = useLocale();
 
   const loading = loadingProducts || loadingCustomers || loadingMethods;
@@ -161,6 +162,11 @@ export default function POSPage() {
   };
 
   const handleSelectCustomer = (customerId: number | string) => {
+    // id 0 = compra de mostrador, sin cliente registrado
+    if (customerId === 0) {
+      setSelectedCustomer(null);
+      return;
+    }
     const customer = customers.find((c) => c.id === customerId);
     if (customer) setSelectedCustomer(customer);
   };
@@ -195,13 +201,13 @@ export default function POSPage() {
     0
   );
 
-  const canCreate = selectedProducts.length > 0 && selectedCustomer && paymentMethod;
+  const canCreate = selectedProducts.length > 0 && Boolean(paymentMethod);
 
   const handleCreateOrder = () => {
-    if (!canCreate) return;
+    if (!canCreate || !paymentMethod) return;
     createOrderMutation.mutate({
-      customerId: selectedCustomer!.id,
-      paymentMethodId: paymentMethod!.id,
+      customerId: selectedCustomer?.id ?? null,
+      paymentMethodId: paymentMethod.id,
       products: selectedProducts.map((p) => ({
         id: p.id,
         quantity: p.quantity,
@@ -248,8 +254,11 @@ export default function POSPage() {
         <CardContent className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1">
             <Combobox
-              items={customers}
-              placeholder={t("selectCustomer")}
+              items={[
+                { id: 0, name: ts("walkIn") },
+                ...customers.map((c) => ({ id: c.id, name: c.name })),
+              ]}
+              placeholder={ts("selectCustomer")}
               onSelect={handleSelectCustomer}
             />
           </div>
