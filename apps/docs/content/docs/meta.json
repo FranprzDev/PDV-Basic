@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "index",
+    "architecture",
+    "tech-stack",
+    "project-structure",
+    "database",
+    "api",
+    "testing",
+    "deployment",
+    "---Fiscal Module---",
+    "fiscal",
+    "---API Reference---",
+    "api-reference",
+    "---Legal---",
+    "legal"
+  ]
+}
