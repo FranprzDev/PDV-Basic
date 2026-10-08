@@ -45,6 +45,7 @@ import { useCrudMutation } from "@/hooks/use-crud-mutation";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { CashCount } from "./cash-count";
 
 type Transaction = RouterOutputs["transactions"]["list"][number];
 type TransactionType = "income" | "expense";
@@ -54,6 +55,9 @@ export default function Cashier() {
 	const trpc = useTRPC();
 	const { data: transactions = [], isLoading } = useQuery(
 		trpc.transactions.list.queryOptions(),
+	);
+	const { data: paymentMethods = [] } = useQuery(
+		trpc.paymentMethods.list.queryOptions(),
 	);
 	const t = useTranslations("cashier");
 	const tc = useTranslations("common");
@@ -249,7 +253,25 @@ export default function Cashier() {
 	};
 
 	return (
-		<>
+		<div className="w-full space-y-4">
+			<CashCount
+				transactions={transactions}
+				methodNames={new Map(paymentMethods.map((m) => [m.id, m.name]))}
+				locale={locale}
+				labels={{
+					title: t("count.title"),
+					subtitle: t("count.subtitle"),
+					expected: t("count.expected"),
+					counted: t("count.counted"),
+					difference: t("count.difference"),
+					exact: t("count.exact"),
+					short: t("count.short"),
+					over: t("count.over"),
+					noMethod: t("count.noMethod"),
+					total: t("count.total"),
+					empty: t("count.empty"),
+				}}
+			/>
 			<Card className="w-full">
 				<CardHeader>
 					<CardTitle>{t("title")}</CardTitle>
@@ -537,6 +559,6 @@ export default function Cashier() {
 				onConfirm={handleDelete}
 				description={t("deleteMessage")}
 			/>
-		</>
+		</div>
 	);
 }
