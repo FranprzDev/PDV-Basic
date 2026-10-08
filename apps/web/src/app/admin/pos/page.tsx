@@ -31,14 +31,16 @@ import {
 	Trash2Icon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useHotkeys } from "@/lib/hotkeys/use-hotkeys";
 import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
 import { findByBarcode } from "@/lib/scanner/barcode";
 import { useBarcodeScanner } from "@/lib/scanner/use-barcode-scanner";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency } from "@/lib/utils";
+import { HotkeySettingsButton } from "./hotkey-settings";
 
 type Product = RouterOutputs["products"]["list"][number];
 type POSProduct = Pick<Product, "id" | "name" | "price" | "in_stock"> & {
@@ -83,6 +85,11 @@ export default function POSPage() {
 		code: string;
 		name?: string;
 	} | null>(null);
+	const searchRef = useRef<HTMLInputElement>(null);
+
+	const focusSearch = () => {
+		searchRef.current?.focus();
+	};
 
 	const addToCart = React.useCallback(
 		(product: Product) => {
@@ -265,6 +272,33 @@ export default function POSPage() {
 		});
 	};
 
+	const bumpLastQuantity = (delta: 1 | -1) => {
+		const last = selectedProducts[selectedProducts.length - 1];
+		if (last) handleQuantityChange(last.id, delta);
+	};
+
+	const removeLastProduct = () => {
+		const last = selectedProducts[selectedProducts.length - 1];
+		if (last) handleRemoveProduct(last.id);
+	};
+
+	const clearSearch = () => {
+		setProductSearch("");
+		setLastScan(null);
+		focusSearch();
+	};
+
+	const { persist: persistHotkeys } = useHotkeys({
+		focusSearch,
+		confirmSale: () => {
+			if (canCreate && !createOrderMutation.isPending) handleCreateOrder();
+		},
+		qtyPlus: () => bumpLastQuantity(1),
+		qtyMinus: () => bumpLastQuantity(-1),
+		removeLast: removeLastProduct,
+		cancel: clearSearch,
+	});
+
 	if (loading) {
 		return (
 			<div className="container mx-auto space-y-4 p-4">
@@ -325,7 +359,27 @@ export default function POSPage() {
 			</Card>
 			<Card>
 				<CardHeader>
-					<CardTitle>{t("products")}</CardTitle>
+					<div className="flex items-center justify-between gap-2">
+						<CardTitle>{t("products")}</CardTitle>
+						<HotkeySettingsButton
+							onSaved={persistHotkeys}
+							labels={{
+								focusSearch: t("hotkeys.focusSearch"),
+								confirmSale: t("hotkeys.confirmSale"),
+								qtyPlus: t("hotkeys.qtyPlus"),
+								qtyMinus: t("hotkeys.qtyMinus"),
+								removeLast: t("hotkeys.removeLast"),
+								cancel: t("hotkeys.cancel"),
+							}}
+							title={t("hotkeys.title")}
+							resetLabel={t("hotkeys.reset")}
+							changeLabel={t("hotkeys.close")}
+							pressKeyLabel={t("hotkeys.pressKey")}
+							conflictLabel={(action) => t("hotkeys.conflict", { action })}
+							reservedLabel={t("hotkeys.reserved")}
+							buttonLabel={t("hotkeys.title")}
+						/>
+					</div>
 					{lastScan && (
 						<div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs">
 							<ScanBarcodeIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -356,6 +410,7 @@ export default function POSPage() {
 								value={productSearch}
 								onChange={(e) => setProductSearch(e.target.value)}
 								className="pl-8"
+								ref={searchRef}
 							/>
 						</div>
 						<Combobox

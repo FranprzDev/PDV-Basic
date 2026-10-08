@@ -19,7 +19,7 @@
       },
     },
     "apps/print-agent": {
-      "name": "@pdv-basic/print-agent",
+      "name": "@finopenpos/print-agent",
       "devDependencies": {
         "@types/node": "^22.13.14",
         "typescript": "^5",
@@ -378,6 +378,8 @@
 
     "@finopenpos/event-sourcing": ["@finopenpos/event-sourcing@workspace:packages/event-sourcing"],
 
+    "@finopenpos/print-agent": ["@finopenpos/print-agent@workspace:apps/print-agent"],
+
     "@finopenpos/ui": ["@finopenpos/ui@workspace:packages/ui"],
 
     "@floating-ui/core": ["@floating-ui/core@1.7.5", "", { "dependencies": { "@floating-ui/utils": "^0.2.11" } }, "sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ=="],
@@ -533,8 +535,6 @@
     "@parcel/watcher-win32-ia32": ["@parcel/watcher-win32-ia32@2.5.6", "", { "os": "win32", "cpu": "ia32" }, "sha512-k35yLp1ZMwwee3Ez/pxBi5cf4AoBKYXj00CZ80jUz5h8prpiaQsiRPKQMxoLstNuqe2vR4RNPEAEcjEFzhEz/g=="],
 
     "@parcel/watcher-win32-x64": ["@parcel/watcher-win32-x64@2.5.6", "", { "os": "win32", "cpu": "x64" }, "sha512-hbQlYcCq5dlAX9Qx+kFb0FHue6vbjlf0FrNzSKdYK2APUf7tGfGxQCk2ihEREmbR6ZMc0MVAD5RIX/41gpUzTw=="],
-
-    "@pdv-basic/print-agent": ["@pdv-basic/print-agent@workspace:apps/print-agent"],
 
     "@prisma/client": ["@prisma/client@7.4.2", "", { "dependencies": { "@prisma/client-runtime-utils": "7.4.2" }, "peerDependencies": { "prisma": "*", "typescript": ">=5.4.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-ts2mu+cQHriAhSxngO3StcYubBGTWDtu/4juZhXCUKOwgh26l+s4KD3vT2kMUzFyrYnll9u/3qWrtzRv9CGWzA=="],
 

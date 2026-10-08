@@ -131,7 +131,7 @@ export class LocalAgentPrinter implements PrinterDriver {
 
 	private readonly baseUrl: string;
 
-	constructor({ port: _port = 9110, baseUrl }: LocalAgentOptions = {}) {
+	constructor({ port = 9110, baseUrl }: LocalAgentOptions = {}) {
 		this.baseUrl = baseUrl ?? `http://localhost:${port}`;
 	}
 
