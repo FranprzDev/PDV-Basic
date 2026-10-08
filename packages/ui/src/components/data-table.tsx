@@ -18,7 +18,7 @@ import {
   TableCell,
 } from "./table";
 import { Button } from "./button";
-import { ArrowUpDown, ArrowUp, ArrowDown, DownloadIcon, TrashIcon, FilePenIcon } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, DownloadIcon } from "lucide-react";
 import { cn } from "../lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ export function DataTable<T>({
   const visibleColumnDefs = useMemo(() => {
     if (!isMobile) return columnDefs;
     return columnDefs.filter(
-      (_, i) => !columns[i].hideOnMobile
+      (_, i) => !columns[i]?.hideOnMobile
     );
   }, [columnDefs, columns, isMobile]);
 
