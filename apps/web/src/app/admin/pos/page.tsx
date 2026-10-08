@@ -31,7 +31,7 @@ import {
 	Trash2Icon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useHotkeys } from "@/lib/hotkeys/use-hotkeys";
 import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
@@ -85,9 +85,10 @@ export default function POSPage() {
 		code: string;
 		name?: string;
 	} | null>(null);
+	const searchRef = useRef<HTMLInputElement>(null);
 
 	const focusSearch = () => {
-		document.getElementById("pos-product-search")?.focus();
+		searchRef.current?.focus();
 	};
 
 	const addToCart = React.useCallback(
@@ -405,11 +406,11 @@ export default function POSPage() {
 							<SearchIcon className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 							<Input
 								type="text"
-								id="pos-product-search"
 								placeholder={t("searchPlaceholder")}
 								value={productSearch}
 								onChange={(e) => setProductSearch(e.target.value)}
 								className="pl-8"
+								ref={searchRef}
 							/>
 						</div>
 						<Combobox
