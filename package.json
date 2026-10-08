@@ -28,6 +28,8 @@
 		"dev": "turbo dev",
 		"build": "turbo build",
 		"check-types": "turbo check-types",
+		"lint": "biome check .",
+		"test": "turbo test",
 		"dev:web": "turbo -F web dev",
 		"db:push": "turbo -F @finopenpos/db db:push",
 		"db:studio": "turbo -F @finopenpos/db db:studio",

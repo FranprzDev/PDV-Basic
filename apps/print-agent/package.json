@@ -1,12 +1,14 @@
 {
-  "name": "@pdv-basic/print-agent",
+  "name": "@finopenpos/print-agent",
   "private": true,
   "type": "module",
   "description": "Agente local que recibe tickets ESC/POS del navegador y los envía a la impresora térmica",
   "main": "src/index.ts",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "check-types": "tsc --noEmit",
+    "lint": "biome check ."
   },
   "devDependencies": {
     "@types/node": "^22.13.14",

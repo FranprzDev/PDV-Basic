@@ -22,12 +22,14 @@ un desarrollo aparte. No es necesario para operar: se vende sin facturar y se ag
 
 ```bash
 bun install
-bun run dev
+cp .env.example .env    # y poné un BETTER_AUTH_SECRET
+bun run db:push
+bun run dev:web
 ```
 
-App en http://localhost:3001
+App en http://localhost:3001 (dev). En prod con compose: http://localhost:3111.
 
-Usuario de prueba: `test@example.com` / `test1234`
+> Usuario demo: ver `bun run db:seed` (issue #9).
 
 La base es **PGLite**: un Postgres embebido que vive en `apps/web/data/pglite`. No hace falta
 instalar nada. Para pasar a una base real, cambiá la conexión y el esquema sigue igual.

@@ -1,0 +1,4 @@
+{
+  "extends": "@finopenpos/config/tsconfig.base.json",
+  "include": ["src"]
+}

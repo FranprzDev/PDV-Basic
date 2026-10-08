@@ -1,54 +1,46 @@
-# Contributing to FinOpenPOS
+# Contributing a PDV-Basic
 
-Thanks for your interest in contributing! This guide explains how to get involved.
-
-## Environment Setup
+## Setup
 
 ```bash
-git clone https://github.com/JoaoHenriqueBarbosa/FinOpenPOS
-cd FinOpenPOS
+git clone https://github.com/FranprzDev/PDV-Basic
+cd PDV-Basic
 bun install
-bun dev
+cp .env.example .env
+bun run db:push
+bun run dev:web
 ```
 
-PGlite runs in-process inside Bun — no need to install PostgreSQL for development.
+App dev en http://localhost:3001. Prod con compose en http://localhost:3111.
 
-## Monorepo Structure
+## Estructura
 
 ```
 apps/
-  web/           → Main Next.js application (POS)
-  print-agent/   → Local agent that forwards ESC/POS tickets to a network printer
+  web/           → Next.js (POS)
+  print-agent/   → Agente ESC/POS local
 packages/
-  api/           → tRPC base (router, procedures, context type)
-  auth/          → Better Auth configuration
-  db/            → Database schema (Drizzle + PGlite)
-  env/           → Typed environment variables
-  event-sourcing/→ Event store, fold, and types
-  ui/            → Shared UI components
+  api/ auth/ db/ env/ event-sourcing/ ui/ config/
 ```
 
-## Contribution Flow
+Base dev: PGLite en `apps/web/data/pglite`, sin instalar Postgres.
 
-1. **Fork** the repository
-2. **Create a branch**: `git checkout -b feat/my-feature`
-3. **Make your changes**
-4. **Run tests**: `bun test`
-5. **Commit** using [conventional commits](https://www.conventionalcommits.org/)
-6. **Push** and open a **Pull Request**
+## Comandos
 
-## Conventional Commits
+```bash
+bun run dev:web      # solo web
+bun run build        # todo
+bun run check-types  # tipos
+bun run lint         # biome check (sin --write)
+bun run test         # tests
+```
 
-| Type | Description |
-|------|-------------|
-| `feat(scope)` | New feature |
-| `fix(scope)` | Bug fix |
-| `docs(scope)` | Documentation |
-| `style(scope)` | Formatting |
-| `refactor(scope)` | Refactoring |
-| `test(scope)` | Tests |
-| `chore(scope)` | Maintenance |
+## Flujo
 
-## Questions?
+1. Fork + branch `feat/mi-cambio`
+2. Commits convencionales (`feat:`, `fix:`, `docs:`)
+3. PR con descripción y test manual
 
-Open an [issue](https://github.com/JoaoHenriqueBarbosa/FinOpenPOS/issues) or start a [discussion](https://github.com/JoaoHenriqueBarbosa/FinOpenPOS/discussions).
+## Dudas
+
+Abrí un [issue](https://github.com/FranprzDev/PDV-Basic/issues).
