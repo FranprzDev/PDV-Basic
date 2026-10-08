@@ -27,13 +27,23 @@ import { formatCurrency } from "@/lib/utils";
 
 interface OrderItem {
 	id: number | string;
-	name?: string;
 	quantity: number;
 	price: number;
+	product_id: number;
+	product?: {
+		name: string;
+		category?: string | null;
+	} | null;
 }
 
 interface OrderDetail {
+	id: number;
 	status: string;
+	total_amount: number;
+	created_at: string | null;
+	customer?: {
+		name: string;
+	} | null;
 	orderItems: OrderItem[];
 }
 

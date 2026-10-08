@@ -16,7 +16,7 @@ import {
 	type HotkeyAction,
 	loadHotkeys,
 	validateBinding,
-} from "@/lib/hotkeys/use-hotkeys";
+} from "@/lib/hotkeys/hotkeys";
 
 interface HotkeySettingsProps {
 	open: boolean;

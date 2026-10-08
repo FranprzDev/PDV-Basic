@@ -10,6 +10,7 @@
 		"db:ensure": "bun scripts/ensure-db.ts",
 		"db:push": "drizzle-kit push",
 		"db:seed": "bun scripts/seed.ts",
+		"check-types": "tsc --noEmit",
 		"test": "bun test src/lib",
 		"test:coverage": "bun test --coverage src/lib"
 	},
