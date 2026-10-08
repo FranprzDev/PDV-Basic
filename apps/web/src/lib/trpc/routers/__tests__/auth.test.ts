@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import type { BaseUser } from "@finopenpos/api";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -8,9 +9,10 @@ const { productsRouter } = await import("../products");
 const { createCallerFactory } = await import("../../init");
 
 const authed = createCallerFactory(productsRouter)({ user: makeUser("u1") });
-const unauth = createCallerFactory(productsRouter)({ user: null as any });
+const unauth = createCallerFactory(productsRouter)({ user: null });
 const undefinedUser = createCallerFactory(productsRouter)({
-	user: undefined as any,
+	// Entrada inválida a propósito: el procedimiento debe rechazarla
+	user: undefined as unknown as BaseUser,
 });
 
 beforeAll(async () => {
@@ -44,9 +46,9 @@ describe("protectedProcedure", () => {
 		expect(product.user_uid).toBe("u1");
 
 		const list = await authed.list();
-		const found = list.find((p) => p.id === product.id);
+		const found = must(list.find((p) => p.id === product.id));
 		expect(found).toBeDefined();
-		expect(found!.user_uid).toBe("u1");
+		expect(found.user_uid).toBe("u1");
 	});
 
 	it("isolates data between users — each sees only own records", async () => {

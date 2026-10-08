@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -58,7 +58,7 @@ describe("transactions.create", () => {
 
 		const after = await caller.list();
 		expect(after.length).toBe(before.length + 1);
-		const found = after.find((x) => x.id === t.id)!;
+		const found = must(after.find((x) => x.id === t.id));
 		expect(found.description).toBe("Sale");
 		expect(found.amount).toBe(500);
 	});
@@ -73,7 +73,7 @@ describe("transactions.create", () => {
 		});
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === t.id)!;
+		const persisted = must(list.find((x) => x.id === t.id));
 		expect(persisted.type).toBe("expense");
 		expect(persisted.category).toBe("overhead");
 		expect(persisted.status).toBe("pending");
@@ -105,7 +105,11 @@ describe("transactions.create", () => {
 
 	it('rejects type: "other" — invalid enum', async () => {
 		await expect(
-			caller.create({ description: "Bad", amount: 100, type: "other" as any }),
+			caller.create({
+				description: "Bad",
+				amount: 100,
+				type: "other" as unknown as "income",
+			}),
 		).rejects.toThrow();
 	});
 });
@@ -126,7 +130,7 @@ describe("transactions.update", () => {
 		expect(updated.status).toBe("completed");
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === t.id)!;
+		const persisted = must(list.find((x) => x.id === t.id));
 		expect(persisted.amount).toBe(200);
 		expect(persisted.status).toBe("completed");
 		expect(persisted.description).toBe("Upd"); // unchanged field preserved
@@ -142,7 +146,7 @@ describe("transactions.update", () => {
 		await expect(other.update({ id: t.id, amount: 999 })).rejects.toThrow();
 
 		const list = await caller.list();
-		const original = list.find((x) => x.id === t.id)!;
+		const original = must(list.find((x) => x.id === t.id));
 		expect(original.amount).toBe(100);
 		expect(original.description).toBe("Mine");
 	});

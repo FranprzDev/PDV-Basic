@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -56,7 +56,7 @@ describe("paymentMethods.create", () => {
 
 		const after = await caller.list();
 		expect(after.length).toBe(before.length + 1);
-		const found = after.find((x) => x.id === pm.id)!;
+		const found = must(after.find((x) => x.id === pm.id));
 		expect(found.name).toBe("Pix");
 	});
 
@@ -87,7 +87,7 @@ describe("paymentMethods.update", () => {
 		expect(updated.name).toBe("NewName");
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === pm.id)!;
+		const persisted = must(list.find((x) => x.id === pm.id));
 		expect(persisted.name).toBe("NewName");
 	});
 

@@ -9,7 +9,8 @@ function resolveLocale(locale?: string) {
 }
 
 function resolveCurrency(locale: string) {
-	return localeCurrencyMap[locale] ?? "USD";
+	const base = locale.split("-")[0] ?? locale;
+	return localeCurrencyMap[locale] ?? localeCurrencyMap[base] ?? "USD";
 }
 
 export function formatDate(date: Date | string, locale?: string) {

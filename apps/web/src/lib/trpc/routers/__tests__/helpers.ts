@@ -13,6 +13,14 @@ export function createTestDb() {
 	return { pg, db };
 }
 
+export function must<T>(
+	value: T | undefined | null,
+	message = "expected value to be defined",
+): T {
+	if (value === undefined || value === null) throw new Error(message);
+	return value;
+}
+
 export function makeUser(id: string) {
 	return {
 		id,

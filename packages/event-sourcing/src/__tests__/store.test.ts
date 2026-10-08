@@ -4,6 +4,12 @@ import { foldStream, foldStreams } from "../fold";
 import { EventStore } from "../store";
 import { ConcurrencyError, type DomainEvent, type StoredEvent } from "../types";
 
+function must<T>(value: T | undefined | null): T {
+	if (value === undefined || value === null)
+		throw new Error("expected value to be defined in test");
+	return value;
+}
+
 type ProductEvent =
 	| DomainEvent<"ProductCreated", { name: string; price: number }>
 	| DomainEvent<"ProductPriceChanged", { price: number }>
@@ -132,7 +138,7 @@ describe("EventStore", () => {
 			userUid: "owner",
 			events: [{ type: "ProductCreated", data: { name: "W", price: 10 } }],
 		});
-		const created = created0!;
+		const created = must(created0);
 		await store.append<ProductEvent>({
 			streamType: "widget",
 			streamId: id,
@@ -165,6 +171,6 @@ describe("EventStore", () => {
 			occurredAt: when,
 			events: [{ type: "ProductCreated", data: { name: "T", price: 5 } }],
 		});
-		expect(e0!.occurredAt.toISOString()).toBe(when.toISOString());
+		expect(must(e0).occurredAt.toISOString()).toBe(when.toISOString());
 	});
 });

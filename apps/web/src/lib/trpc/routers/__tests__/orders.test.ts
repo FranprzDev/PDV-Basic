@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -58,9 +58,9 @@ describe("orders.list", () => {
 
 		const list = await caller.list();
 		expect(list.length).toBe(1);
-		const order = list[0];
+		const order = must(list[0]);
 		expect(order.customer).toBeDefined();
-		expect(order.customer!.name).toBe("Test Customer");
+		expect(must(order.customer).name).toBe("Test Customer");
 		expect(order.total_amount).toBe(2000);
 		expect(order.user_uid).toBe("user-1");
 	});
@@ -89,7 +89,7 @@ describe("orders.create", () => {
 		expect(order.id).toBeGreaterThan(0);
 		expect(order.total_amount).toBe(3000);
 		expect(order.status).toBe("completed");
-		expect(order.customer!.name).toBe("Test Customer");
+		expect(must(order.customer).name).toBe("Test Customer");
 
 		// Verify order appeared in list
 		const after = await caller.list();
@@ -98,11 +98,13 @@ describe("orders.create", () => {
 		// Verify items via read model (rebuilt from OrderPlaced event)
 		const detail = await caller.get({ id: order.id });
 		expect(detail).not.toBeNull();
-		expect(detail!.orderItems.length).toBe(1);
-		expect(detail!.orderItems[0].quantity).toBe(3);
-		expect(detail!.orderItems[0].price).toBe(1000);
-		expect(detail!.orderItems[0].product_id).toBe(productId);
-		expect(detail!.orderItems[0].product!.name).toBe("Test Product");
+		const d = must(detail);
+		const item = must(d.orderItems[0]);
+		expect(d.orderItems.length).toBe(1);
+		expect(item.quantity).toBe(3);
+		expect(item.price).toBe(1000);
+		expect(item.product_id).toBe(productId);
+		expect(must(item.product).name).toBe("Test Product");
 
 		// Verify the payment transaction was recorded in the event log
 		const txns = (await listTransactions("user-1")).filter(
@@ -144,7 +146,7 @@ describe("orders.update", () => {
 		expect(updated.status).toBe("cancelled");
 
 		const list = await caller.list();
-		const persisted = list.find((o) => o.id === order.id)!;
+		const persisted = must(list.find((o) => o.id === order.id));
 		expect(persisted.status).toBe("cancelled");
 		expect(persisted.total_amount).toBe(500); // unchanged field preserved
 	});
@@ -157,12 +159,15 @@ describe("orders.update", () => {
 			total: 500,
 		});
 		await expect(
-			caller.update({ id: order.id, status: "bogus" as any }),
+			caller.update({
+				id: order.id,
+				status: "bogus" as unknown as "completed",
+			}),
 		).rejects.toThrow();
 
 		// Original status untouched
 		const list = await caller.list();
-		const persisted = list.find((o) => o.id === order.id)!;
+		const persisted = must(list.find((o) => o.id === order.id));
 		expect(persisted.status).toBe("completed");
 	});
 });

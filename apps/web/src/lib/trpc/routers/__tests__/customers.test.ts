@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -50,7 +50,7 @@ describe("customers.create", () => {
 
 		const after = await caller.list();
 		expect(after.length).toBe(before.length + 1);
-		const found = after.find((x) => x.id === c.id)!;
+		const found = must(after.find((x) => x.id === c.id));
 		expect(found.name).toBe("John");
 		expect(found.email).toBe("john@example.com");
 	});
@@ -64,7 +64,7 @@ describe("customers.create", () => {
 		});
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === c.id)!;
+		const persisted = must(list.find((x) => x.id === c.id));
 		expect(persisted.phone).toBe("123456");
 		expect(persisted.status).toBe("active");
 	});
@@ -89,7 +89,11 @@ describe("customers.create", () => {
 
 	it("rejects invalid status enum", async () => {
 		await expect(
-			caller.create({ name: "X", email: "enum@t.com", status: "bogus" as any }),
+			caller.create({
+				name: "X",
+				email: "enum@t.com",
+				status: "bogus" as unknown as "active",
+			}),
 		).rejects.toThrow();
 	});
 
@@ -113,7 +117,7 @@ describe("customers.update", () => {
 		expect(updated.name).toBe("New");
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === c.id)!;
+		const persisted = must(list.find((x) => x.id === c.id));
 		expect(persisted.name).toBe("New");
 		expect(persisted.email).toBe("upd@t.com"); // unchanged field preserved
 	});
@@ -124,7 +128,7 @@ describe("customers.update", () => {
 		await expect(other.update({ id: c.id, name: "Hacked" })).rejects.toThrow();
 
 		const list = await caller.list();
-		const original = list.find((x) => x.id === c.id)!;
+		const original = must(list.find((x) => x.id === c.id));
 		expect(original.name).toBe("Mine");
 	});
 });

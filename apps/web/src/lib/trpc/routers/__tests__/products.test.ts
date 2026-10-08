@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { createTestDb, makeUser, SCHEMA_DDL } from "./helpers";
+import { createTestDb, makeUser, must, SCHEMA_DDL } from "./helpers";
 
 const { pg, db } = createTestDb();
 mock.module("@/lib/db", () => ({ db, pglite: pg }));
@@ -70,10 +70,10 @@ describe("products.create", () => {
 
 		const after = await caller.list();
 		expect(after.length).toBe(before.length + 1);
-		const found = after.find((x) => x.id === p.id);
+		const found = must(after.find((x) => x.id === p.id));
 		expect(found).toBeDefined();
-		expect(found!.name).toBe("Widget");
-		expect(found!.price).toBe(1500);
+		expect(found.name).toBe("Widget");
+		expect(found.price).toBe(1500);
 	});
 
 	it("omitted optional fields are null in DB", async () => {
@@ -82,7 +82,7 @@ describe("products.create", () => {
 		expect(p.category).toBeNull();
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === p.id)!;
+		const persisted = must(list.find((x) => x.id === p.id));
 		expect(persisted.description).toBeNull();
 		expect(persisted.category).toBeNull();
 	});
@@ -99,7 +99,7 @@ describe("products.create", () => {
 		expect(p.category).toBe("cat");
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === p.id)!;
+		const persisted = must(list.find((x) => x.id === p.id));
 		expect(persisted.description).toBe("desc");
 		expect(persisted.category).toBe("cat");
 	});
@@ -131,7 +131,7 @@ describe("products.update", () => {
 		expect(updated.price).toBe(200);
 
 		const list = await caller.list();
-		const persisted = list.find((x) => x.id === p.id)!;
+		const persisted = must(list.find((x) => x.id === p.id));
 		expect(persisted.name).toBe("New");
 		expect(persisted.price).toBe(200);
 		expect(persisted.in_stock).toBe(1); // unchanged field preserved
@@ -143,7 +143,7 @@ describe("products.update", () => {
 		await expect(other.update({ id: p.id, name: "Hacked" })).rejects.toThrow();
 
 		const list = await caller.list();
-		const original = list.find((x) => x.id === p.id)!;
+		const original = must(list.find((x) => x.id === p.id));
 		expect(original.name).toBe("Mine");
 		expect(original.price).toBe(100);
 	});
