@@ -101,7 +101,12 @@ if (!opts.host && !opts.file) {
 }
 
 const server = startAgent(
-	{ host: opts.host, port: opts.port, file: opts.file, timeoutMs: opts.timeoutMs },
+	{
+		host: opts.host,
+		port: opts.port,
+		file: opts.file,
+		timeoutMs: opts.timeoutMs,
+	},
 	opts.agentPort,
 );
 

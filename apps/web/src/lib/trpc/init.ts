@@ -1,9 +1,9 @@
 import {
-  router,
-  createCallerFactory,
-  publicProcedure,
-  protectedProcedure,
-  type TRPCContext,
+	createCallerFactory,
+	protectedProcedure,
+	publicProcedure,
+	router,
+	type TRPCContext,
 } from "@finopenpos/api";
 import { getAuthUser } from "@/lib/auth-guard";
 
@@ -11,6 +11,6 @@ export { router, createCallerFactory, publicProcedure, protectedProcedure };
 export type { TRPCContext };
 
 export const createTRPCContext = async (): Promise<TRPCContext> => {
-  const user = await getAuthUser();
-  return { user };
+	const user = await getAuthUser();
+	return { user };
 };

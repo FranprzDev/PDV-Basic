@@ -15,11 +15,11 @@
 import type { EscPosEncoder } from "./escpos-encoder";
 
 export interface PrinterDriver {
-  readonly id: "webusb" | "localAgent" | "osPrint";
-  readonly label: string;
-  isAvailable(): boolean;
-  print(bytes: Uint8Array): Promise<void>;
-  openDrawer(): Promise<void>;
+	readonly id: "webusb" | "localAgent" | "osPrint";
+	readonly label: string;
+	isAvailable(): boolean;
+	print(bytes: Uint8Array): Promise<void>;
+	openDrawer(): Promise<void>;
 }
 
 // ── 1. WebUSB ────────────────────────────────────────────────────────────────
@@ -83,17 +83,22 @@ export class WebUsbPrinter implements PrinterDriver {
 			)
 			.find((ep: USBEndpoint) => ep.direction === "out");
 
-		if (!endpoint) throw new Error("La impresora no tiene endpoint de escritura");
+		if (!endpoint)
+			throw new Error("La impresora no tiene endpoint de escritura");
 
 		// Los offsets USB son de 1 byte: hay que partir en trozos de 255.
 		const MAX = 255;
 		for (let i = 0; i < bytes.length; i += MAX) {
-			await this.device!.transferOut(
+			const d1 = this.device;
+			if (!d1) throw new Error("Impresora no conectada");
+			await d1.transferOut(
 				endpoint.endpointNumber,
 				bytes.slice(i, i + MAX) as BufferSource,
 			);
 		}
-		await this.device!.releaseInterface(interfaceNumber);
+		const d2 = this.device;
+		if (!d2) throw new Error("Impresora no conectada");
+		await d2.releaseInterface(interfaceNumber);
 	}
 
 	async print(bytes: Uint8Array): Promise<void> {
@@ -101,7 +106,9 @@ export class WebUsbPrinter implements PrinterDriver {
 	}
 
 	async openDrawer(): Promise<void> {
-		await this.write(new Uint8Array([0x1b, 0x70, 0x00, 0x19, 0xfa, 0x00, 0x00]));
+		await this.write(
+			new Uint8Array([0x1b, 0x70, 0x00, 0x19, 0xfa, 0x00, 0x00]),
+		);
 	}
 
 	disconnect(): void {
@@ -122,11 +129,9 @@ export class LocalAgentPrinter implements PrinterDriver {
 	readonly id = "localAgent" as const;
 	readonly label = "Agente local (impresora de red)";
 
-	private readonly port: number;
 	private readonly baseUrl: string;
 
-	constructor({ port = 9110, baseUrl }: LocalAgentOptions = {}) {
-		this.port = port;
+	constructor({ port: _port = 9110, baseUrl }: LocalAgentOptions = {}) {
 		this.baseUrl = baseUrl ?? `http://localhost:${port}`;
 	}
 
@@ -141,7 +146,9 @@ export class LocalAgentPrinter implements PrinterDriver {
 			body: JSON.stringify(body),
 		});
 		if (!res.ok) {
-			throw new Error(`El agente local respondió ${res.status}. ¿Está corriendo?`);
+			throw new Error(
+				`El agente local respondió ${res.status}. ¿Está corriendo?`,
+			);
 		}
 		return res;
 	}
@@ -198,7 +205,9 @@ export class OsPrint implements PrinterDriver {
 
 	/** El diálogo del sistema no puede mandar un pulso al cajón. */
 	async openDrawer(): Promise<void> {
-		throw new Error("La impresión del sistema no puede abrir el cajón de dinero");
+		throw new Error(
+			"La impresión del sistema no puede abrir el cajón de dinero",
+		);
 	}
 }
 

@@ -28,7 +28,7 @@ function money(value: number): string {
 	});
 }
 
-function buildHeader(enc: EscPosEncoder, data: TicketData, width: number): void {
+function buildHeader(enc: EscPosEncoder, data: TicketData): void {
 	enc.init().codePage(858).align("center").bold(true);
 	enc.doubleSize({ height: true });
 	enc.line(data.businessName);
@@ -92,7 +92,7 @@ export function buildTicket(data: TicketData, paperWidth: 58 | 80 = 80) {
 	const width = paperWidth === 58 ? WIDTH_58 : WIDTH_80;
 	const enc = new EscPosEncoder();
 
-	buildHeader(enc, data, width);
+	buildHeader(enc, data);
 	buildMeta(enc, data, width);
 	const total = buildItems(enc, data.items, width);
 	buildFooter(enc, data, total, width);
@@ -125,6 +125,7 @@ export function buildTestTicket(
 
 /** Bytes para abrir el cajón de dinero, sin imprimir nada. */
 export function buildDrawerPulse(): Uint8Array {
-	return new EscPosEncoder().command(0x1b, 0x70, 0x00, 0x19, 0xfa, 0x00, 0x00)
+	return new EscPosEncoder()
+		.command(0x1b, 0x70, 0x00, 0x19, 0xfa, 0x00, 0x00)
 		.toBytes();
 }

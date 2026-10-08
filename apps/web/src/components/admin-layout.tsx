@@ -122,7 +122,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 			{/* Mobile drawer overlay */}
 			{mobileMenuOpen && (
 				<div className="fixed inset-0 z-50 sm:hidden">
-					<div
+					<button
+						type="button"
+						aria-label="Cerrar menú"
 						className="fixed inset-0 bg-black/50"
 						onClick={() => setMobileMenuOpen(false)}
 					/>

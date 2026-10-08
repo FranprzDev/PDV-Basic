@@ -1,16 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-
-import { buildTicket, buildTestTicket, type TicketData } from "./ticket";
 import {
-	LocalAgentPrinter,
-	WebUsbPrinter,
 	createPrinterDriver,
+	LocalAgentPrinter,
 	type PrinterDriver,
+	WebUsbPrinter,
 } from "./drivers";
+import { buildTestTicket, buildTicket, type TicketData } from "./ticket";
 
 const STORAGE_KEY = "pdv:printer-driver";
 

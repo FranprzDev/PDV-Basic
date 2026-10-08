@@ -9,7 +9,13 @@ const ESC = 0x1b;
 
 /** Pulso eléctrico en el pin del cajón (pin 2 en la mayoría de las impresoras). */
 export const DRAWER_PULSE = Uint8Array.from([
-	ESC, 0x70, 0x00, 0x19, 0xfa, 0x00, 0x00,
+	ESC,
+	0x70,
+	0x00,
+	0x19,
+	0xfa,
+	0x00,
+	0x00,
 ]);
 
 export const RESET = Uint8Array.from([ESC, 0x40]);

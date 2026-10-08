@@ -1,5 +1,5 @@
-import { connect, type Socket } from "node:net";
 import { appendFile } from "node:fs/promises";
+import { connect, type Socket } from "node:net";
 
 /**
  * Transporte hacia la impresora.
@@ -75,11 +75,9 @@ function writeToSocket(
 		socket.on("error", (error: NodeJS.ErrnoException) => {
 			const hint =
 				error.code === "ECONNREFUSED"
-					? ` (¿está encendida y en la misma red?)`
+					? " (¿está encendida y en la misma red?)"
 					: "";
-			finish(
-				new PrinterError(`${error.message}${hint}`, "unreachable"),
-			);
+			finish(new PrinterError(`${error.message}${hint}`, "unreachable"));
 		});
 
 		// some printers reset the connection if you close too fast
@@ -92,9 +90,7 @@ function writeToSocket(
 }
 
 /** Verifica que la impresora responda. No imprime nada. */
-export async function checkPrinter(
-	target: PrinterTarget,
-): Promise<boolean> {
+export async function checkPrinter(target: PrinterTarget): Promise<boolean> {
 	if (target.file) return true;
 	try {
 		await writeToSocket(target, Uint8Array.from([]));

@@ -1,6 +1,15 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { checkPrinter, PrinterError, sendToPrinter, type PrinterTarget } from "./printer";
-import { decodeBase64, DRAWER_PULSE } from "./escpos";
+import {
+	createServer,
+	type IncomingMessage,
+	type ServerResponse,
+} from "node:http";
+import { DRAWER_PULSE, decodeBase64 } from "./escpos";
+import {
+	checkPrinter,
+	PrinterError,
+	type PrinterTarget,
+	sendToPrinter,
+} from "./printer";
 
 /**
  * Servidor local que hace de puente entre el navegador y la impresora.
@@ -21,7 +30,8 @@ function corsHeaders(origin: string | undefined): Record<string, string> {
 	// Solo origenes locales: el agente escucha en loopback, pero un sitio
 	// cualquiera abierto en el navegador podría intentar hablarle.
 	const allowed =
-		origin && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+		origin &&
+		/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
 
 	return {
 		...(allowed ? { "access-control-allow-origin": origin } : {}),
@@ -57,7 +67,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 export function startAgent(target: PrinterTarget, port: number) {
 	const server = createServer(async (req, res) => {
 		const cors = corsHeaders(req.headers.origin);
-		Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
+		for (const [k, v] of Object.entries(cors)) res.setHeader(k, v);
 
 		if (req.method === "OPTIONS") {
 			res.writeHead(204);
@@ -73,7 +83,9 @@ export function startAgent(target: PrinterTarget, port: number) {
 				return json(res, 200, {
 					ok: true,
 					printer: reachable,
-					target: target.file ? `archivo:${target.file}` : `${target.host}:${target.port}`,
+					target: target.file
+						? `archivo:${target.file}`
+						: `${target.host}:${target.port}`,
 				});
 			}
 

@@ -173,13 +173,13 @@ describe("dashboard.stats", () => {
 		const stats = await caller.stats();
 		expect(stats.totalRevenue).toBe(1775);
 		// revenueByCategory.selling should be 1525, not 1525+5000=6525
-		expect(stats.revenueByCategory["selling"]).toBe(1525);
+		expect(stats.revenueByCategory.selling).toBe(1525);
 	});
 
 	it("revenueByCategory groups correctly, missing category excluded from map", async () => {
 		const { revenueByCategory } = await caller.stats();
-		expect(revenueByCategory["selling"]).toBe(1525);
-		expect(revenueByCategory["refund"]).toBe(200);
+		expect(revenueByCategory.selling).toBe(1525);
+		expect(revenueByCategory.refund).toBe(200);
 		expect("null" in revenueByCategory).toBe(false);
 		expect(Object.keys(revenueByCategory).length).toBe(2);
 		// 50 with no category is not in any bucket
@@ -192,7 +192,7 @@ describe("dashboard.stats", () => {
 
 	it("expensesByCategory groups correctly", async () => {
 		const { expensesByCategory } = await caller.stats();
-		expect(expensesByCategory["overhead"]).toBe(400);
+		expect(expensesByCategory.overhead).toBe(400);
 		expect(Object.keys(expensesByCategory).length).toBe(1);
 	});
 

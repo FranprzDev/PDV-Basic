@@ -1,57 +1,65 @@
-import {
-  useMutation,
-  useQueryClient,
-  type UseMutationOptions,
-} from "@tanstack/react-query";
 import type { MutationFunctionContext } from "@tanstack/query-core";
+import {
+	type UseMutationOptions,
+	useMutation,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 
 interface UseCrudMutationOptions<TData, TError, TVariables, TOnMutateResult> {
-  mutationOptions: UseMutationOptions<TData, TError, TVariables, TOnMutateResult>;
-  invalidateKeys: unknown[];
-  successMessage: string;
-  errorMessage: string;
-  onSuccess?: (data: TData) => void;
+	mutationOptions: UseMutationOptions<
+		TData,
+		TError,
+		TVariables,
+		TOnMutateResult
+	>;
+	invalidateKeys: unknown[];
+	successMessage: string;
+	errorMessage: string;
+	onSuccess?: (data: TData) => void;
 }
 
 export function useCrudMutation<
-  TData,
-  TError = Error,
-  TVariables = void,
-  TOnMutateResult = unknown,
+	TData,
+	TError = Error,
+	TVariables = void,
+	TOnMutateResult = unknown,
 >({
-  mutationOptions,
-  invalidateKeys,
-  successMessage,
-  errorMessage,
-  onSuccess: onSuccessCallback,
+	mutationOptions,
+	invalidateKeys,
+	successMessage,
+	errorMessage,
+	onSuccess: onSuccessCallback,
 }: UseCrudMutationOptions<TData, TError, TVariables, TOnMutateResult>) {
-  const queryClient = useQueryClient();
+	const queryClient = useQueryClient();
 
-  const { onSuccess: originalOnSuccess, onError: originalOnError, ...rest } =
-    mutationOptions;
+	const {
+		onSuccess: originalOnSuccess,
+		onError: originalOnError,
+		...rest
+	} = mutationOptions;
 
-  return useMutation<TData, TError, TVariables, TOnMutateResult>({
-    ...rest,
-    onSuccess: (
-      data: TData,
-      variables: TVariables,
-      onMutateResult: TOnMutateResult,
-      context: MutationFunctionContext,
-    ) => {
-      queryClient.invalidateQueries({ queryKey: invalidateKeys });
-      toast.success(successMessage);
-      onSuccessCallback?.(data);
-      originalOnSuccess?.(data, variables, onMutateResult, context);
-    },
-    onError: (
-      error: TError,
-      variables: TVariables,
-      onMutateResult: TOnMutateResult | undefined,
-      context: MutationFunctionContext,
-    ) => {
-      toast.error(errorMessage);
-      originalOnError?.(error, variables, onMutateResult, context);
-    },
-  });
+	return useMutation<TData, TError, TVariables, TOnMutateResult>({
+		...rest,
+		onSuccess: (
+			data: TData,
+			variables: TVariables,
+			onMutateResult: TOnMutateResult,
+			context: MutationFunctionContext,
+		) => {
+			queryClient.invalidateQueries({ queryKey: invalidateKeys });
+			toast.success(successMessage);
+			onSuccessCallback?.(data);
+			originalOnSuccess?.(data, variables, onMutateResult, context);
+		},
+		onError: (
+			error: TError,
+			variables: TVariables,
+			onMutateResult: TOnMutateResult | undefined,
+			context: MutationFunctionContext,
+		) => {
+			toast.error(errorMessage);
+			originalOnError?.(error, variables, onMutateResult, context);
+		},
+	});
 }

@@ -10,8 +10,8 @@ import {
 	type TransactionEvent,
 } from "@/lib/es";
 import { auth } from "../auth";
-import { catalogo } from "./catalogo-almacen";
 import { db } from ".";
+import { catalogo } from "./catalogo-almacen";
 
 const DEMO_EMAIL = "test@example.com";
 const DEMO_PASSWORD = "test1234";
@@ -45,7 +45,13 @@ export async function seed() {
 
 	// ── Payment Methods ──────────────────────────────────────────────────────
 	const paymentMethodIds: number[] = [];
-	for (const name of ["Efectivo", "Tarjeta de débito", "Tarjeta de crédito", "Transferencia", "Mercado Pago"]) {
+	for (const name of [
+		"Efectivo",
+		"Tarjeta de débito",
+		"Tarjeta de crédito",
+		"Transferencia",
+		"Mercado Pago",
+	]) {
 		const id = await eventStore.nextStreamId(STREAM.paymentMethod);
 		await eventStore.append<PaymentMethodEvent>({
 			streamType: STREAM.paymentMethod,
