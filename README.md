@@ -1,76 +1,82 @@
 # PDV-Basic
 
-Punto de venta para comercios de barrio, en español, pensado para Argentina.
+Point of sale for neighborhood stores, Spanish-first, built for Argentina.
 
-Derivado de [FinOpenPOS](https://github.com/JoaoHenriqueBarbosa/FinOpenPOS) (MIT), reimplantado
-para el mercado local.
+Derived from [FinOpenPOS](https://github.com/JoaoHenriqueBarbosa/FinOpenPOS) (MIT),
+reworked for the local market.
 
-## Qué le sumamos
+## What we added
 
-- **Español por defecto** (con voseo rioplatense). Inglés y portugués siguen disponibles.
-- **Código de barras** en productos, con escaneo desde la pistola USB.
-- **Atajos rápidos** en el panel: nueva venta, nuevo producto, nuevo cliente, movimientos de
-  caja y buscar precio escaneando.
-- **Impresora térmica**: protocolo ESC/POS propio, sin librerías, con soporte para acentos.
+- **Spanish by default** (rioplatense voseo). English and Portuguese still available.
+- **Barcodes** on products, scanned with a USB gun.
+- **Fast sale**: configurable keyboard shortcuts in the POS (F2 search, F9 confirm,
+  +/- quantity, Del remove, Esc clear) plus cash count by payment method with chart.
+- **Quick actions** panel: new sale, new product, new customer, cash movements,
+  scan-to-price.
+- **Thermal printer**: own ESC/POS protocol, no libraries, with accent support.
 
-## Lo que no incluye
+## What it doesn't include
 
-No incluye facturación electrónica. Para facturar en Argentina hay que sumar AFIP/ARCA, que es
-un desarrollo aparte. No es necesario para operar: se vende sin facturar y se agrega después.
+No electronic invoicing. Invoicing in Argentina requires AFIP/ARCA, which is a
+separate project. Not needed to operate: sell without invoicing, add it later.
 
-## Arranque
+## Quickstart
 
 ```bash
 bun install
-cp .env.example .env    # y poné un BETTER_AUTH_SECRET
+cp .env.example .env    # and set a BETTER_AUTH_SECRET
 bun run db:push
+bun run db:seed
 bun run dev:web
 ```
 
-App en http://localhost:3001 (dev). En prod con compose: http://localhost:3111.
+App at http://localhost:3001 (dev). Prod with compose: http://localhost:3111.
 
-> Usuario demo: ver `bun run db:seed` (issue #9).
+> Demo user: `test@example.com` / `test1234` (created by `db:seed`).
 
-La base es **PGLite**: un Postgres embebido que vive en `apps/web/data/pglite`. No hace falta
-instalar nada. Para pasar a una base real, cambiá la conexión y el esquema sigue igual.
+The database is **PGLite**: embedded Postgres living in `apps/web/data/pglite`.
+Nothing to install. To move to a real database, switch the connection string;
+the schema stays the same.
 
-## Escáner de código de barras
+Docs: `docs/setup.md`, `docs/deploy.md`, `docs/printing.md`, `docs/roadmap.md`.
 
-Cualquier lector en **modo teclado (USB HID)** funciona, sin instalar nada. Antes de comprar,
-verificá que el vendedor lo tenga en ese modo (lo suelen llamar *keyboard wedge*).
+## Barcode scanner
 
-El panel tiene un atajo **Escanear precio**: apuntá el lector y te muestra el producto y su
-precio. Si el código no existe, te ofrece registrarlo.
+Any reader in **keyboard mode (USB HID)** works, nothing to install. Before buying,
+check with the seller that it ships in that mode (aka *keyboard wedge*).
 
-## Impresora térmica
+The panel has a **Scan price** shortcut: point the reader and it shows the product
+and its price. If the code doesn't exist, it offers to register it.
 
-Hay tres formas de imprimir, misma interfaz:
+## Thermal printer
 
-| Driver | Requiere | Sirve para |
+Three ways to print, same interface:
+
+| Driver | Requires | Good for |
 |---|---|---|
-| **WebUSB** | Chrome o Edge, autorizar una vez | Impresora por USB, sin instalar nada |
-| **Agente local** | Un servicio en la máquina del local | Impresora de red (lo que se compra hoy) |
-| **Impresión del sistema** | Nada | Plan B: no corta papel ni abre el cajón |
+| **WebUSB** | Chrome or Edge, authorize once | USB printer, nothing to install |
+| **Local agent** | A service on the store machine | Network printer (what's usually bought) |
+| **System print** | Nothing | Plan B: no paper cut, no cash drawer |
 
-**Importante:** las impresoras térmicas vienen con la tabla de códigos en CP437, que no tiene
-`ñ`, `á` ni `é`. El codificador setea CP858 automáticamente. Si ves caracteres raros en el
-ticket, es que falta eso.
+**Important:** thermal printers ship with the CP437 code table, which lacks
+`ñ`, `á`, `é`. The encoder sets CP858 automatically. Garbled characters on the
+ticket mean that's missing.
 
-## Publicar
+## Deploy
 
 ```bash
-cp .env.example .env    # y poné un BETTER_AUTH_SECRET
+cp .env.example .env    # and set a BETTER_AUTH_SECRET
 docker compose up -d
 ```
 
-Queda en http://localhost:3111. Un contenedor, un volumen de datos.
+Up at http://localhost:3111. One container, one data volume.
 
-La impresora se conecta desde la máquina del local:
+The printer connects from the store machine:
 
 ```bash
 docker compose run --rm print-agent --host 192.168.1.50
 ```
 
-## Licencia
+## License
 
-MIT. Ver [LICENSE](LICENSE), que conserva el aviso original de FinOpenPOS.
+MIT. See [LICENSE](LICENSE), keeping the original FinOpenPOS notice.
