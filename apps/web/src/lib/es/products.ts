@@ -9,6 +9,7 @@ export interface ProductCreatedData {
 	description?: string;
 	price: number;
 	in_stock: number;
+	min_stock?: number;
 	category?: string;
 	barcode?: string;
 	unit_of_measure?: string;
@@ -28,6 +29,7 @@ export interface Product {
 	description: string | null;
 	price: number;
 	in_stock: number;
+	min_stock: number;
 	category: string | null;
 	barcode: string | null;
 	user_uid: string;
@@ -39,6 +41,14 @@ function definedOnly<T extends object>(data: T): Partial<T> {
 	return Object.fromEntries(
 		Object.entries(data).filter(([, v]) => v !== undefined),
 	) as Partial<T>;
+}
+
+/** ¿Está en o por debajo del mínimo? Sin mínimo configurado nunca activa. */
+export function isBelowMinimum(product: {
+	min_stock: number;
+	in_stock: number;
+}): boolean {
+	return product.min_stock > 0 && product.in_stock <= product.min_stock;
 }
 
 export function productReducer(
@@ -54,6 +64,7 @@ export function productReducer(
 				description: d.description ?? null,
 				price: d.price,
 				in_stock: d.in_stock,
+				min_stock: d.min_stock ?? 0,
 				category: d.category ?? null,
 				barcode: d.barcode ?? null,
 				user_uid: event.userUid,
@@ -97,6 +108,14 @@ export async function loadProduct(
 }
 
 // ── Consultas ────────────────────────────────────────────────────────────────
+
+/** Productos en o por debajo del mínimo: candidatos a reponer. */
+export async function listLowStock(userUid: string): Promise<Product[]> {
+	const products = await listProducts(userUid);
+	return products
+		.filter(isBelowMinimum)
+		.sort((a, b) => a.in_stock - b.in_stock);
+}
 
 export async function findProductByBarcode(
 	userUid: string,

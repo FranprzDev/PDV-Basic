@@ -4,6 +4,7 @@ import {
 	createProduct,
 	deleteProduct,
 	findProductByBarcode,
+	listLowStock,
 	listProducts,
 	updateProduct,
 } from "@/lib/es";
@@ -15,6 +16,7 @@ const productSchema = z.object({
 	description: z.string().nullable(),
 	price: z.number(),
 	in_stock: z.number(),
+	min_stock: z.number(),
 	category: z.string().nullable(),
 	barcode: z.string().nullable(),
 	user_uid: z.string(),
@@ -30,6 +32,14 @@ export const productsRouter = router({
 			return listProducts(ctx.user.id);
 		}),
 
+	/** Productos en o por debajo del mínimo: lista de reposición. */
+	lowStock: protectedProcedure
+		.input(z.void())
+		.output(z.array(productSchema))
+		.query(async ({ ctx }) => {
+			return listLowStock(ctx.user.id);
+		}),
+
 	create: protectedProcedure
 		.input(
 			z.object({
@@ -37,6 +47,7 @@ export const productsRouter = router({
 				description: z.string().optional(),
 				price: z.number().int(),
 				in_stock: z.number().int().min(0),
+				min_stock: z.number().int().min(0).optional(),
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
 				unit_of_measure: z.string().max(6).optional(),
@@ -55,6 +66,7 @@ export const productsRouter = router({
 				description: z.string().optional(),
 				price: z.number().int().optional(),
 				in_stock: z.number().int().min(0).optional(),
+				min_stock: z.number().int().min(0).optional(),
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
 				unit_of_measure: z.string().max(6).optional(),

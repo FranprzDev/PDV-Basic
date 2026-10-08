@@ -96,6 +96,9 @@ const messages: Messages = {
 		cashFlow: "Fluxo de Caixa",
 		dailyTransactionVolume: "Volume diário de transações",
 		noDataYet: "Sem dados de {section} ainda",
+		lowStock: "Estoque Baixo",
+		stockOk: "Todo o estoque está acima do mínimo",
+		replenishHint: "Reponha estes produtos para não perder vendas",
 	},
 	products: {
 		addProduct: "Adicionar Produto",
@@ -103,6 +106,8 @@ const messages: Messages = {
 		allStock: "Todo Estoque",
 		inStock: "Em Estoque",
 		outOfStock: "Sem Estoque",
+		lowStock: "Estoque Baixo",
+		minStock: "Estoque Mínimo",
 		product: "Produto",
 		stock: "Estoque",
 		editProduct: "Editar Produto",
@@ -239,6 +244,7 @@ const messages: Messages = {
 		outOfStock: "{name} está sem estoque",
 		limitedStock: "Apenas {count} unidades de {name} disponíveis",
 		limitedUnits: "Apenas {count} unidades disponíveis",
+		belowMinimum: "{name} chegou ao estoque mínimo",
 		hotkeys: {
 			title: "Atalhos de teclado",
 			reset: "Redefinir",

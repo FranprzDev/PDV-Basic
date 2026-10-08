@@ -59,6 +59,7 @@ export default function Products() {
 		description: z.string(),
 		price: z.number().min(0, t("priceMustBePositive")),
 		in_stock: z.number().int().min(0, t("stockMustBeNonNegative")),
+		min_stock: z.number().int().min(0, t("stockMustBeNonNegative")),
 		barcode: z.string(),
 		category: z.string(),
 		unit_of_measure: z.string(),
@@ -75,6 +76,7 @@ export default function Products() {
 		{ label: t("allStock"), value: "all" },
 		{ label: t("inStock"), value: "in-stock", variant: "success" },
 		{ label: t("outOfStock"), value: "out-of-stock", variant: "danger" },
+		{ label: t("lowStock"), value: "low-stock", variant: "warning" },
 	];
 
 	const columns: Column<Product>[] = [
@@ -93,6 +95,12 @@ export default function Products() {
 			render: (row) => formatCurrency(row.price, locale),
 		},
 		{ key: "in_stock", header: t("stock"), sortable: true },
+		{
+			key: "min_stock",
+			header: t("minStock"),
+			sortable: true,
+			hideOnMobile: true,
+		},
 	];
 
 	const exportColumns: ExportColumn<Product>[] = [
@@ -108,6 +116,11 @@ export default function Products() {
 			getValue: (p) => (p.price / 100).toFixed(2),
 		},
 		{ key: "in_stock", header: t("stock"), getValue: (p) => p.in_stock },
+		{
+			key: "min_stock",
+			header: t("minStock"),
+			getValue: (p) => p.min_stock,
+		},
 		{ key: "barcode", header: t("barcode"), getValue: (p) => p.barcode ?? "" },
 		{
 			key: "category",
@@ -156,6 +169,7 @@ export default function Products() {
 			description: "",
 			price: 0,
 			in_stock: 0,
+			min_stock: 0,
 			barcode: "",
 			category: "",
 			unit_of_measure: "UN",
@@ -169,6 +183,7 @@ export default function Products() {
 				description: value.description || undefined,
 				price: Math.round(value.price * 100),
 				in_stock: value.in_stock,
+				min_stock: value.min_stock,
 				barcode: value.barcode || undefined,
 				category: value.category || undefined,
 				unit_of_measure: value.unit_of_measure || undefined,
@@ -187,6 +202,9 @@ export default function Products() {
 				return false;
 			if (stockFilter === "in-stock" && p.in_stock === 0) return false;
 			if (stockFilter === "out-of-stock" && p.in_stock > 0) return false;
+			if (stockFilter === "low-stock") {
+				if (p.min_stock <= 0 || p.in_stock > p.min_stock) return false;
+			}
 			return p.name.toLowerCase().includes(searchTerm.toLowerCase());
 		});
 	}, [products, categoryFilter, stockFilter, searchTerm]);
@@ -204,6 +222,7 @@ export default function Products() {
 		form.setFieldValue("description", p.description ?? "");
 		form.setFieldValue("price", p.price / 100);
 		form.setFieldValue("in_stock", p.in_stock);
+		form.setFieldValue("min_stock", p.min_stock);
 		form.setFieldValue("barcode", p.barcode ?? "");
 		form.setFieldValue("category", p.category ?? "");
 		form.setFieldValue("unit_of_measure", p.unit_of_measure ?? "");
@@ -405,6 +424,34 @@ export default function Products() {
 											<Input
 												id="in_stock"
 												type="number"
+												value={field.state.value}
+												onChange={(e) =>
+													field.handleChange(Number(e.target.value))
+												}
+												onBlur={field.handleBlur}
+												error={
+													field.state.meta.errors.length > 0
+														? field.state.meta.errors
+																.map((e) => e?.message ?? e)
+																.join(", ")
+														: undefined
+												}
+											/>
+										</div>
+									</div>
+								)}
+							</form.Field>
+							<form.Field name="min_stock">
+								{(field) => (
+									<div className="flex flex-col gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+										<Label htmlFor="min_stock" className="sm:text-right">
+											{t("minStock")}
+										</Label>
+										<div className="col-span-3">
+											<Input
+												id="min_stock"
+												type="number"
+												min="0"
 												value={field.state.value}
 												onChange={(e) =>
 													field.handleChange(Number(e.target.value))
