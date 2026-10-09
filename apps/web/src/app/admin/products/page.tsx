@@ -39,6 +39,7 @@ import { useMemo, useState } from "react";
 import { z } from "zod/v4";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { useCrudMutation } from "@/hooks/use-crud-mutation";
+import { isBelowMinimum } from "@/lib/es/products";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency } from "@/lib/utils";
@@ -202,9 +203,7 @@ export default function Products() {
 				return false;
 			if (stockFilter === "in-stock" && p.in_stock === 0) return false;
 			if (stockFilter === "out-of-stock" && p.in_stock > 0) return false;
-			if (stockFilter === "low-stock") {
-				if (p.min_stock <= 0 || p.in_stock > p.min_stock) return false;
-			}
+			if (stockFilter === "low-stock" && !isBelowMinimum(p)) return false;
 			return p.name.toLowerCase().includes(searchTerm.toLowerCase());
 		});
 	}, [products, categoryFilter, stockFilter, searchTerm]);

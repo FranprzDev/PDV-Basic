@@ -4,6 +4,7 @@ import {
 	isBelowMinimum,
 	type Product,
 	type ProductCreatedData,
+	type ProductEvent,
 	productReducer,
 } from "@/lib/es/products";
 
@@ -24,39 +25,42 @@ function product(overrides: Partial<Product> = {}): Product {
 	};
 }
 
-function created(data: ProductCreatedData): Product | undefined {
-	return productReducer(undefined, {
-		type: "ProductCreated",
-		data,
+function stored(event: ProductEvent): StoredEvent<ProductEvent> {
+	return {
+		globalSeq: 1,
+		streamType: "product",
 		streamId: 7,
 		userUid: "u1",
 		occurredAt: new Date(),
-		globalSeq: 1,
 		version: 0,
-	} as StoredEvent<{
-		type: "ProductCreated";
-		data: ProductCreatedData;
-	}>);
+		...event,
+	};
 }
 
 describe("productReducer", () => {
 	it("min_stock por defecto es 0 si no viene", () => {
-		const state = created({
+		const data: ProductCreatedData = {
 			name: "Coca",
 			price: 1500,
 			in_stock: 12,
-		});
-		expect(state?.min_stock).toBe(0);
+		};
+		expect(
+			productReducer(undefined, stored({ type: "ProductCreated", data }))
+				?.min_stock,
+		).toBe(0);
 	});
 
 	it("guarda min_stock cuando viene", () => {
-		const state = created({
+		const data: ProductCreatedData = {
 			name: "Coca",
 			price: 1500,
 			in_stock: 12,
 			min_stock: 5,
-		});
-		expect(state?.min_stock).toBe(5);
+		};
+		expect(
+			productReducer(undefined, stored({ type: "ProductCreated", data }))
+				?.min_stock,
+		).toBe(5);
 	});
 });
 
