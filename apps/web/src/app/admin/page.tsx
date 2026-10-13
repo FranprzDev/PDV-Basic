@@ -32,6 +32,7 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
+import { LowStockCard } from "@/components/low-stock-card";
 import { QuickActions } from "@/components/quick-actions";
 import { useTRPC } from "@/lib/trpc/client";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
@@ -92,6 +93,7 @@ export default function Page() {
 
 			{/* KPI Cards */}
 			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+				<LowStockCard />
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 						<CardTitle className="font-medium text-sm">

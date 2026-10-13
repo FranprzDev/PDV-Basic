@@ -33,6 +33,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { isBelowMinimum } from "@/lib/es/products";
 import { useHotkeys } from "@/lib/hotkeys/use-hotkeys";
 import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
 import { findByBarcode } from "@/lib/scanner/barcode";
@@ -134,6 +135,9 @@ export default function POSPage() {
 			if (product) {
 				addToCart(product);
 				setLastScan({ code, name: product.name });
+				if (isBelowMinimum(product)) {
+					toast.warning(t("belowMinimum", { name: product.name }));
+				}
 			} else {
 				setLastScan({ code });
 				toast.error(tScanner("notFound", { code }), {
