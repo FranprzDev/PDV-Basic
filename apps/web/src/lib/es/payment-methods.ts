@@ -3,15 +3,27 @@ import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
 import { eventStore, STREAM } from "./store";
 
 // ── Eventos ─────────────────────────────────────────────────────────────────
+export interface PaymentMethodCreatedData {
+	name: string;
+	/** Si es un medio "a cuenta": la venta se fía al cliente en vez de cobrarse. */
+	is_account?: boolean;
+}
+
+export interface PaymentMethodRenamedData {
+	name: string;
+	is_account?: boolean;
+}
+
 export type PaymentMethodEvent =
-	| DomainEvent<"PaymentMethodCreated", { name: string }>
-	| DomainEvent<"PaymentMethodRenamed", { name: string }>
+	| DomainEvent<"PaymentMethodCreated", PaymentMethodCreatedData>
+	| DomainEvent<"PaymentMethodRenamed", PaymentMethodRenamedData>
 	| DomainEvent<"PaymentMethodDeleted", Record<string, never>>;
 
 // ── Estado ──────────────────────────────────────────────────────────────────
 export interface PaymentMethod {
 	id: number;
 	name: string;
+	is_account: boolean;
 	created_at: Date;
 }
 
@@ -20,16 +32,25 @@ export function paymentMethodReducer(
 	event: StoredEvent<PaymentMethodEvent>,
 ): PaymentMethod | undefined {
 	switch (event.type) {
-		case "PaymentMethodCreated":
+		case "PaymentMethodCreated": {
+			const d = event.data as PaymentMethodCreatedData;
 			return {
 				id: event.streamId,
-				name: (event.data as { name: string }).name,
+				name: d.name,
+				is_account: d.is_account ?? false,
 				created_at: event.occurredAt,
 			};
-		case "PaymentMethodRenamed":
+		}
+		case "PaymentMethodRenamed": {
+			const d = event.data as PaymentMethodRenamedData;
 			return state
-				? { ...state, name: (event.data as { name: string }).name }
+				? {
+						...state,
+						name: d.name,
+						...(d.is_account !== undefined ? { is_account: d.is_account } : {}),
+					}
 				: state;
+		}
 		case "PaymentMethodDeleted":
 			return undefined;
 		default:
@@ -43,6 +64,17 @@ export async function listPaymentMethods(): Promise<PaymentMethod[]> {
 		STREAM.paymentMethod,
 	]);
 	return [...foldStreams(events, paymentMethodReducer).values()];
+}
+
+/** Busca un medio de pago por id, si existe. */
+export async function findPaymentMethod(
+	id: number,
+): Promise<PaymentMethod | undefined> {
+	const events = await eventStore.readStream<PaymentMethodEvent>(
+		STREAM.paymentMethod,
+		id,
+	);
+	return foldStream(events, paymentMethodReducer).state;
 }
 
 async function assertNameAvailable(
@@ -66,6 +98,7 @@ async function assertNameAvailable(
 export async function createPaymentMethod(
 	userUid: string,
 	name: string,
+	is_account = false,
 ): Promise<PaymentMethod> {
 	await assertNameAvailable(name);
 	const id = await eventStore.nextStreamId(STREAM.paymentMethod);
@@ -74,7 +107,7 @@ export async function createPaymentMethod(
 		streamId: id,
 		expectedVersion: 0,
 		userUid,
-		events: [{ type: "PaymentMethodCreated", data: { name } }],
+		events: [{ type: "PaymentMethodCreated", data: { name, is_account } }],
 	});
 	const state = paymentMethodReducer(
 		undefined,
@@ -88,6 +121,7 @@ export async function renamePaymentMethod(
 	userUid: string,
 	id: number,
 	name: string,
+	is_account?: boolean,
 ): Promise<PaymentMethod | undefined> {
 	const events = await eventStore.readStream<PaymentMethodEvent>(
 		STREAM.paymentMethod,
@@ -102,7 +136,7 @@ export async function renamePaymentMethod(
 		streamId: id,
 		expectedVersion: version,
 		userUid,
-		events: [{ type: "PaymentMethodRenamed", data: { name } }],
+		events: [{ type: "PaymentMethodRenamed", data: { name, is_account } }],
 	});
 	return paymentMethodReducer(state, stored as StoredEvent<PaymentMethodEvent>);
 }

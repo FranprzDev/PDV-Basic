@@ -13,6 +13,9 @@ reworked for the local market.
   +/- quantity, Del remove, Esc clear) plus cash count by payment method with chart.
 - **Stock that moves**: the server prices the cart from the catalog and decrements
   stock in the same atomic fact as the order and the payment.
+- **Store credit (fiado)**: sell on account, partial payments, per-customer credit
+  limit and account statement. The customer carries a balance instead of a paper
+  notebook; the sale is recorded when the money comes in.
 - **Quick actions** panel: new sale, new product, new customer, cash movements,
   scan-to-price.
 - **Thermal printer**: own ESC/POS protocol, no libraries, with accent support.

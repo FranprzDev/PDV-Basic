@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@finopenpos/ui/components/badge";
 import { Button } from "@finopenpos/ui/components/button";
 import { Card, CardContent, CardHeader } from "@finopenpos/ui/components/card";
 import {
@@ -48,6 +49,7 @@ export default function PaymentMethodsPage() {
 
 	const paymentMethodSchema = z.object({
 		name: z.string().min(1, t("nameRequired")),
+		is_account: z.boolean(),
 	});
 
 	const tableColumns: Column<PaymentMethod>[] = [
@@ -56,6 +58,16 @@ export default function PaymentMethodsPage() {
 			header: tc("name"),
 			sortable: true,
 			className: "font-medium",
+		},
+		{
+			key: "is_account",
+			header: t("accountColumn"),
+			render: (row) =>
+				row.is_account ? (
+					<Badge variant="secondary">{t("isAccount")}</Badge>
+				) : (
+					<span className="text-muted-foreground">—</span>
+				),
 		},
 	];
 
@@ -91,15 +103,22 @@ export default function PaymentMethodsPage() {
 	});
 
 	const form = useForm({
-		defaultValues: { name: "" },
+		defaultValues: { name: "", is_account: false },
 		validators: {
 			onSubmit: paymentMethodSchema,
 		},
 		onSubmit: ({ value }) => {
 			if (isEditing) {
-				updateMutation.mutate({ id: editingId, name: value.name });
+				updateMutation.mutate({
+					id: editingId,
+					name: value.name,
+					is_account: value.is_account,
+				});
 			} else {
-				createMutation.mutate({ name: value.name });
+				createMutation.mutate({
+					name: value.name,
+					is_account: value.is_account,
+				});
 			}
 		},
 	});
@@ -114,6 +133,7 @@ export default function PaymentMethodsPage() {
 		setEditingId(m.id);
 		form.reset();
 		form.setFieldValue("name", m.name);
+		form.setFieldValue("is_account", m.is_account);
 		setIsDialogOpen(true);
 	};
 
@@ -251,6 +271,26 @@ export default function PaymentMethodsPage() {
 													}
 												}}
 											/>
+										</div>
+									</div>
+								)}
+							</form.Field>
+							<form.Field name="is_account">
+								{(field) => (
+									<div className="flex flex-col gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+										<Label htmlFor="method-account">{t("isAccount")}</Label>
+										<div className="col-span-3 flex items-center gap-3">
+											<input
+												id="method-account"
+												type="checkbox"
+												className="h-4 w-4 rounded border-input accent-primary"
+												checked={field.state.value}
+												onChange={(e) => field.handleChange(e.target.checked)}
+												onBlur={field.handleBlur}
+											/>
+											<span className="text-muted-foreground text-sm">
+												{t("isAccountHint")}
+											</span>
 										</div>
 									</div>
 								)}

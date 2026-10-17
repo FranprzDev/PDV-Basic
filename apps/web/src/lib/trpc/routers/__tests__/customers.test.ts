@@ -6,6 +6,8 @@ mock.module("@/lib/db", () => ({ db, pglite: pg }));
 
 const { customersRouter } = await import("../customers");
 const { createCallerFactory } = await import("../../init");
+const { createPaymentMethod, createProduct, listTransactions, placeOrder } =
+	await import("@/lib/es");
 
 const caller = createCallerFactory(customersRouter)({
 	user: makeUser("user-1"),
@@ -154,5 +156,116 @@ describe("customers.delete", () => {
 
 		const list = await caller.list();
 		expect(list.some((x) => x.id === c.id)).toBe(false);
+	});
+});
+
+describe("customers — cuenta corriente (fiado)", () => {
+	/** Cliente con una venta fiada ya cargada en su cuenta. */
+	async function withBalance(name: string, email: string, total: number) {
+		const customer = await caller.create({ name, email });
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			`Cuenta-${email}`,
+			true,
+		);
+		const product = await createProduct("user-1", {
+			name: `Prod-${email}`,
+			price: total,
+			in_stock: 10,
+		});
+		await placeOrder("user-1", {
+			customerId: customer.id,
+			paymentMethodId: accountMethod.id,
+			products: [{ product_id: product.id, quantity: 1 }],
+		});
+		return customer;
+	}
+
+	it("balances y account muestran el saldo cargado", async () => {
+		const customer = await withBalance("Saldo Uno", "saldo@t.com", 1000);
+
+		const balances = await caller.balances();
+		expect(
+			must(balances.find((b) => b.customer_id === customer.id)).balance,
+		).toBe(1000);
+
+		const account = await caller.account({ id: customer.id });
+		expect(account.balance).toBe(1000);
+		expect(account.movements.length).toBe(1);
+		expect(must(account.movements[0]).type).toBe("charge");
+	});
+
+	it("pay baja el saldo y registra el ingreso en la misma operación", async () => {
+		const customer = await withBalance("Paga Uno", "paga@t.com", 2000);
+		const cash = await createPaymentMethod("user-1", "Efectivo-Pago", false);
+
+		const account = await caller.pay({
+			id: customer.id,
+			amount: 1500,
+			paymentMethodId: cash.id,
+		});
+		expect(account.balance).toBe(500);
+		expect(account.movements.length).toBe(2);
+
+		const payment = must(
+			(await listTransactions("user-1")).find(
+				(t) => t.description === "Pago a cuenta — Paga Uno",
+			),
+		);
+		expect(payment.amount).toBe(1500);
+		expect(payment.type).toBe("income");
+		expect(payment.category).toBe("selling");
+		expect(payment.status).toBe("completed");
+	});
+
+	it("acepta pagos parciales hasta saldar la cuenta", async () => {
+		const customer = await withBalance("Parcial", "parcial@t.com", 1000);
+		const cash = await createPaymentMethod("user-1", "Efectivo-Parcial", false);
+
+		await caller.pay({
+			id: customer.id,
+			amount: 400,
+			paymentMethodId: cash.id,
+		});
+		const afterFirst = await caller.account({ id: customer.id });
+		expect(afterFirst.balance).toBe(600);
+
+		await caller.pay({
+			id: customer.id,
+			amount: 600,
+			paymentMethodId: cash.id,
+		});
+		const afterSecond = await caller.account({ id: customer.id });
+		expect(afterSecond.balance).toBe(0);
+	});
+
+	it("rechaza un pago mayor al saldo", async () => {
+		const customer = await withBalance("Excede", "excede@t.com", 1000);
+		const cash = await createPaymentMethod("user-1", "Efectivo-Excede", false);
+		await expect(
+			caller.pay({ id: customer.id, amount: 1001, paymentMethodId: cash.id }),
+		).rejects.toThrow(/no puede superar/);
+		expect((await caller.account({ id: customer.id })).balance).toBe(1000);
+	});
+
+	it("rechaza pagar a un cliente sin saldo pendiente", async () => {
+		const c = await caller.create({
+			name: "Sin Saldo",
+			email: "sinsaldo@t.com",
+		});
+		const cash = await createPaymentMethod("user-1", "Efectivo-Sin", false);
+		await expect(
+			caller.pay({ id: c.id, amount: 100, paymentMethodId: cash.id }),
+		).rejects.toThrow(/no tiene saldo/);
+	});
+
+	it("aísla por usuario: no se ve ni se paga la cuenta ajena", async () => {
+		const customer = await withBalance("Aislada", "aislada@t.com", 1000);
+		const other = callerAs("otro-user");
+
+		expect((await other.balances()).length).toBe(0);
+		await expect(
+			other.pay({ id: customer.id, amount: 100, paymentMethodId: 1 }),
+		).rejects.toThrow();
 	});
 });

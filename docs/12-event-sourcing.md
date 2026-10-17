@@ -4,9 +4,9 @@
 
 **Estado:** aceptado — rama `feat/cqrs-event-sourcing`
 
-Los dominios operacionales (productos, clientes, pedidos, transacciones y métodos
-de pago) pasan a ser **event-sourced de verdad**: la única fuente de
-verdad es el log append-only `events`, y **todo estado se reconstruye por
+Los dominios operacionales (productos, clientes, cuentas corrientes, pedidos,
+transacciones y métodos de pago) pasan a ser **event-sourced de verdad**: la única
+fuente de verdad es el log append-only `events`, y **todo estado se reconstruye por
 replay de los eventos en cada lectura — no existen snapshots ni tablas de
 estado materializado**.
 
@@ -61,7 +61,7 @@ Decisiones extraídas:
 
 ### Fuera del alcance del event sourcing
 
-Nada más allá de los cinco dominios operacionales es event-sourced hoy. El schema
+Nada más allá de los seis dominios operacionales es event-sourced hoy. El schema
 tiene solo la tabla `events` y las tablas de auth de Better Auth.
 
 ## Arquitectura
@@ -71,8 +71,9 @@ apps/web/src/lib/trpc/routers/*    ← contrato tRPC/OpenAPI inalterado
         │ comandos                       │ queries
         ▼                                ▼
 apps/web/src/lib/es/*              (write side)   (read side)
-  products / customers / orders /   comandos +     proyecciones: readAll +
-  transactions / payment-methods    reducers       foldStreams por request
+  products / customers / accounts /  comandos +     proyecciones: readAll +
+  orders / transactions /            reducers       foldStreams por request
+  payment-methods
         ▼
 packages/event-sourcing            EventStore (append, appendMany, readStream,
                                    readAll, nextStreamId), foldStream(s), tipos
@@ -88,6 +89,7 @@ tabla `events` (PGlite)            global_seq | stream_type | stream_id |
 |---|---|
 | `product` | `ProductCreated`, `ProductUpdated`, `StockDecremented`, `StockRestocked`, `ProductDeleted` |
 | `customer` | `CustomerCreated`, `CustomerUpdated`, `CustomerDeleted` |
+| `account` | `AccountCharged`, `AccountPaid`, `AccountChargeCancelled` |
 | `order` | `OrderPlaced` (con ítems embebidos), `OrderUpdated`, `OrderCancelled`, `OrderDeleted` |
 | `transaction` | `TransactionRecorded`, `TransactionUpdated`, `TransactionDeleted` |
 | `payment_method` | `PaymentMethodCreated`, `PaymentMethodRenamed`, `PaymentMethodDeleted` |
@@ -97,18 +99,25 @@ Observaciones:
 - Los **ítems del pedido** son parte del hecho `OrderPlaced` (un pedido se
   coloca con sus ítems — no existen eventos por ítem). El `id` de ítem
   expuesto en la API es sintético y estable (`order_id * 1000 + índice + 1`).
-- La venta en el POS es **un solo comando atómico** que graba en tres agregados:
-  `OrderPlaced` (pedido), `StockDecremented` por ítem (stock) y
-  `TransactionRecorded` (pago) — todo en un único `appendMany` (un INSERT). Si
-  cualquier stream cambió en el medio tiempo, el comando entero es rechazado.
+- La venta en el POS es **un solo comando atómico** que graba en varios agregados:
+  `OrderPlaced` (pedido), `StockDecremented` por ítem (stock) y el cobro — ya sea
+  `TransactionRecorded` (venta cobrada) o `AccountCharged` (venta fiada) — todo en
+  un único `appendMany` (un INSERT). Si cualquier stream cambió en el medio tiempo,
+  el comando entero es rechazado.
+- La **cuenta corriente** (`stream_id` = id del cliente) es un saldo a favor o en
+  contra del almacén: `AccountCharged` suma deuda, `AccountPaid` la baja (y
+  registra el ingreso recién ahí, cuando entra la plata) y `AccountChargeCancelled`
+  devuelve el saldo de una venta fiada anulada. El saldo es la suma con signo de
+  los movimientos; un saldo negativo es crédito a favor del cliente.
 - El **precio y el total salen del catálogo del servidor**; el cliente solo manda qué
   y cuánto. El stock se valida y se descuenta como parte del mismo hecho — el POS no
   es la autoridad sobre el precio ni sobre la disponibilidad.
 - Borrar el pedido **no borra** la transacción ni devuelve el stock — los hechos
   históricos permanecen en el log. Anular es distinto y explícito: un comando
-  atómico que graba `OrderCancelled` + `StockRestocked` por ítem y un
-  `TransactionRecorded` con importe negativo (categoría `refund`) en el mismo
-  medio de pago. Nada se edita: se agregan hechos nuevos.
+  atómico que graba `OrderCancelled` + `StockRestocked` por ítem y revierte el
+  cobro (`TransactionRecorded` con importe negativo, categoría `refund`, en el
+  mismo medio de pago; o `AccountChargeCancelled` si la venta era fiada). Nada se
+  edita: se agregan hechos nuevos.
 - `deleted` es un evento como cualquier otro: el reducer devuelve `undefined`
   y la proyección elimina la entidad del read model. El historial sigue
   disponible para auditoría/replay.
@@ -130,9 +139,13 @@ Observaciones:
   cantidad si está configurado, si no el común) vive en `unitPriceFor` y la
   usan tanto el servidor como el POS para no desincronizarse.
 - Stock: la venta solo pasa si hay `in_stock` suficiente de cada producto;
-  la baja entra en el mismo append atómico del pedido y del pago.
+  la baja entra en el mismo append atómico del pedido y del cobro.
+- Fiado: una venta a cuenta exige un cliente y no puede superar su tope de
+  crédito (`credit_limit + saldo actual`); el cargo y el pedido entran juntos.
+- Pago a cuenta: no se puede pagar más que el saldo pendiente ni a una cuenta
+  sin deuda; el pago y su transacción de ingreso entran en el mismo append.
 - Anulación: una venta anulada devuelve exactamente las unidades que descontó
-  y revierte el pago con una transacción negativa; reintentar la anulación se
+  y revierte el cobro (pago o saldo fiado); reintentar la anulación se
   rechaza (no se reintegra dos veces).
 
 ## Referencias
