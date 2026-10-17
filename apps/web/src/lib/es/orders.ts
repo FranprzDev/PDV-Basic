@@ -5,7 +5,12 @@ import type {
 } from "@finopenpos/event-sourcing";
 import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
 import { customerMap } from "./customers";
-import { loadProduct, type ProductEvent, productMap } from "./products";
+import {
+	loadProduct,
+	type ProductEvent,
+	productMap,
+	unitPriceFor,
+} from "./products";
 import { eventStore, STREAM } from "./store";
 import { listTransactions, type TransactionEvent } from "./transactions";
 
@@ -249,7 +254,11 @@ export async function placeOrder(
 		}
 
 		const { version } = await loadProduct(productId);
-		items.push({ product_id: productId, quantity, price: product.price });
+		items.push({
+			product_id: productId,
+			quantity,
+			price: unitPriceFor(product, quantity),
+		});
 		stockStreams.push({
 			streamType: STREAM.product,
 			streamId: productId,

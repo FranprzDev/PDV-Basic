@@ -9,6 +9,8 @@ Estado: POS rápido + atajos + arqueo hechos (ver `main`).
 - Anulación de ventas: reintegra el stock y revierte el pago en el mismo medio
   (`OrderCancelled` + `StockRestocked` + transacción `refund`), sin editar el log
 - Stock mínimo + alerta (endpoint lowStock, tarjeta en dashboard, aviso en POS)
+- Listas de precios: precio mayorista por cantidad (regla compartida servidor/POS)
+  + ajuste masivo por % con redondeo y previsualización
 - Arqueo de caja por medio de pago + gráfico
 - Seed demo, CI, lint/tipos/tests en verde
 
@@ -17,14 +19,12 @@ Estado: POS rápido + atajos + arqueo hechos (ver `main`).
    límite de crédito, historial. El diferencial del almacén ("chau cuadernito").
 2. **Balanza / peso variable** — etiquetas `20XXXXXPPPPP`, venta por kg
    (precio × peso). Sin esto no hay fiambrería/verdulería.
-3. **Listas de precios + aumento masivo** — minorista/mayorista, remarcación
-   por % y ofertas con vigencia. Imprescindible con inflación.
-4. **Proveedores + ingreso de mercadería** — remito de compra que suma stock
+3. **Proveedores + ingreso de mercadería** — remito de compra que suma stock
    y registra costo real.
-5. **ARCA / factura electrónica** — Factura C + CAE + QR, cola offline.
+4. **ARCA / factura electrónica** — Factura C + CAE + QR, cola offline.
    Último: alto esfuerzo y dependencia externa.
 
-Orden sugerido: 1 → 2 → 3 → 4 → 5.
+Orden sugerido: 1 → 2 → 3 → 4.
 
 ## P1 / P2 (después)
 - Vencimientos/lotes, pago mixto + QR con acreditación, multi-sucursal,

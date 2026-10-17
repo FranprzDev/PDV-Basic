@@ -126,7 +126,9 @@ Observaciones:
 - Alcance por usuario: los comandos verifican `user_uid` del stream antes de
   grabar; las queries filtran eventos por `user_uid` en el SQL.
 - Precio y total de una venta: calculados en el servidor a partir del catálogo,
-  nunca aceptados del cliente.
+  nunca aceptados del cliente. La regla de precio vigente (mayorista por
+  cantidad si está configurado, si no el común) vive en `unitPriceFor` y la
+  usan tanto el servidor como el POS para no desincronizarse.
 - Stock: la venta solo pasa si hay `in_stock` suficiente de cada producto;
   la baja entra en el mismo append atómico del pedido y del pago.
 - Anulación: una venta anulada devuelve exactamente las unidades que descontó

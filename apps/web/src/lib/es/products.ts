@@ -1,4 +1,8 @@
-import type { DomainEvent, StoredEvent } from "@finopenpos/event-sourcing";
+import type {
+	DomainEvent,
+	StoredEvent,
+	StreamAppend,
+} from "@finopenpos/event-sourcing";
 import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
 import { findByBarcode } from "@/lib/scanner/barcode";
 import { eventStore, STREAM } from "./store";
@@ -13,6 +17,10 @@ export interface ProductCreatedData {
 	category?: string;
 	barcode?: string;
 	unit_of_measure?: string;
+	/** Precio por cantidad a partir de `wholesale_min_qty`. */
+	wholesale_price?: number | null;
+	/** Cantidad desde la que aplica el precio mayorista. */
+	wholesale_min_qty?: number | null;
 }
 
 export type ProductUpdatedData = Partial<ProductCreatedData>;
@@ -46,6 +54,8 @@ export interface Product {
 	barcode: string | null;
 	user_uid: string;
 	unit_of_measure: string | null;
+	wholesale_price: number | null;
+	wholesale_min_qty: number | null;
 	created_at: Date;
 }
 
@@ -61,6 +71,26 @@ export function isBelowMinimum(product: {
 	in_stock: number;
 }): boolean {
 	return product.min_stock > 0 && product.in_stock <= product.min_stock;
+}
+
+/**
+ * Precio unitario vigente: mayorista si la cantidad alcanza el mínimo
+ * configurado, si no minorista. Es la regla que usan tanto el servidor
+ * (para cobrar) como el POS (para mostrar), así no se desincronizan.
+ */
+export function unitPriceFor(
+	product: Pick<Product, "price" | "wholesale_price" | "wholesale_min_qty">,
+	quantity: number,
+): number {
+	if (
+		product.wholesale_price !== null &&
+		product.wholesale_min_qty !== null &&
+		product.wholesale_min_qty > 0 &&
+		quantity >= product.wholesale_min_qty
+	) {
+		return product.wholesale_price;
+	}
+	return product.price;
 }
 
 export function productReducer(
@@ -81,6 +111,8 @@ export function productReducer(
 				barcode: d.barcode ?? null,
 				user_uid: event.userUid,
 				unit_of_measure: d.unit_of_measure ?? "UN",
+				wholesale_price: d.wholesale_price ?? null,
+				wholesale_min_qty: d.wholesale_min_qty ?? null,
 				created_at: event.occurredAt,
 			};
 		}
@@ -200,4 +232,90 @@ export async function deleteProduct(
 		userUid,
 		events: [{ type: "ProductDeleted", data: {} }],
 	});
+}
+
+// ── Ajuste masivo de precios ────────────────────────────────────────────────
+export interface BulkPriceAdjustInput {
+	scope: "all" | "category";
+	category?: string;
+	/** Porcentaje a aplicar: 15 = +15%, -10 = -10%. */
+	percent: number;
+	/** Redondeo del precio resultante, en centavos (100 = al peso). 0 = sin redondeo. */
+	roundTo?: number;
+}
+
+export interface PriceChange {
+	product_id: number;
+	name: string;
+	before: number;
+	after: number;
+	wholesale_before: number | null;
+	wholesale_after: number | null;
+}
+
+function adjustPrice(price: number, percent: number, roundTo?: number): number {
+	const raw = price * (1 + percent / 100);
+	if (roundTo && roundTo > 0) {
+		const rounded = Math.round(raw / roundTo) * roundTo;
+		// Un redondeo agresivo no debe dejar un precio en cero.
+		return rounded > 0 ? rounded : Math.round(raw);
+	}
+	return Math.round(raw);
+}
+
+/**
+ * Calcula qué productos cambiarían y a qué precio, sin grabar nada. El
+ * porcentaje se aplica también al precio mayorista para conservar el margen.
+ */
+export async function previewBulkPriceAdjust(
+	userUid: string,
+	input: BulkPriceAdjustInput,
+): Promise<PriceChange[]> {
+	const products = await listProducts(userUid);
+	return products
+		.filter((p) => input.scope === "all" || p.category === input.category)
+		.map((p) => ({
+			product_id: p.id,
+			name: p.name,
+			before: p.price,
+			after: adjustPrice(p.price, input.percent, input.roundTo),
+			wholesale_before: p.wholesale_price,
+			wholesale_after:
+				p.wholesale_price === null
+					? null
+					: adjustPrice(p.wholesale_price, input.percent, input.roundTo),
+		}))
+		.filter(
+			(c) => c.after !== c.before || c.wholesale_after !== c.wholesale_before,
+		);
+}
+
+/**
+ * Aplica el ajuste como `ProductUpdated` nuevos en un único append atómico:
+ * o se actualizan todos los productos, o ninguno.
+ */
+export async function applyBulkPriceAdjust(
+	userUid: string,
+	input: BulkPriceAdjustInput,
+): Promise<PriceChange[]> {
+	const changes = await previewBulkPriceAdjust(userUid, input);
+	if (changes.length === 0) return [];
+
+	const streams: StreamAppend<ProductEvent>[] = [];
+	for (const change of changes) {
+		const { version } = await loadProduct(change.product_id);
+		const data: ProductUpdatedData = { price: change.after };
+		if (change.wholesale_after !== null) {
+			data.wholesale_price = change.wholesale_after;
+		}
+		streams.push({
+			streamType: STREAM.product,
+			streamId: change.product_id,
+			expectedVersion: version,
+			events: [{ type: "ProductUpdated", data }],
+		});
+	}
+
+	await eventStore.appendMany<ProductEvent>(streams, { userUid });
+	return changes;
 }

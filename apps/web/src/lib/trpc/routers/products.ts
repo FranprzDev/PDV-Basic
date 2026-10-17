@@ -1,11 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 import {
+	applyBulkPriceAdjust,
 	createProduct,
 	deleteProduct,
 	findProductByBarcode,
 	listLowStock,
 	listProducts,
+	previewBulkPriceAdjust,
 	updateProduct,
 } from "@/lib/es";
 import { protectedProcedure, router } from "../init";
@@ -21,6 +23,8 @@ const productSchema = z.object({
 	barcode: z.string().nullable(),
 	user_uid: z.string(),
 	unit_of_measure: z.string().nullable(),
+	wholesale_price: z.number().nullable(),
+	wholesale_min_qty: z.number().nullable(),
 	created_at: z.date().nullable(),
 });
 
@@ -51,6 +55,8 @@ export const productsRouter = router({
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
 				unit_of_measure: z.string().max(6).optional(),
+				wholesale_price: z.number().int().min(0).nullable().optional(),
+				wholesale_min_qty: z.number().int().min(1).nullable().optional(),
 			}),
 		)
 		.output(productSchema)
@@ -70,6 +76,8 @@ export const productsRouter = router({
 				category: z.string().optional(),
 				barcode: z.string().max(64).optional(),
 				unit_of_measure: z.string().max(6).optional(),
+				wholesale_price: z.number().int().min(0).nullable().optional(),
+				wholesale_min_qty: z.number().int().min(1).nullable().optional(),
 			}),
 		)
 		.output(productSchema)
@@ -78,6 +86,39 @@ export const productsRouter = router({
 			const updated = await updateProduct(ctx.user.id, id, data);
 			if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
 			return updated;
+		}),
+
+	/** Ajusta precios por porcentaje. Con `dryRun` sólo devuelve la previsualización. */
+	bulkAdjust: protectedProcedure
+		.input(
+			z.object({
+				scope: z.enum(["all", "category"]),
+				category: z.string().optional(),
+				percent: z.number().min(-99),
+				roundTo: z.number().int().min(0).optional(),
+				dryRun: z.boolean().optional(),
+			}),
+		)
+		.output(
+			z.object({
+				changes: z.array(
+					z.object({
+						product_id: z.number(),
+						name: z.string(),
+						before: z.number(),
+						after: z.number(),
+						wholesale_before: z.number().nullable(),
+						wholesale_after: z.number().nullable(),
+					}),
+				),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const { dryRun, ...adjust } = input;
+			const changes = dryRun
+				? await previewBulkPriceAdjust(ctx.user.id, adjust)
+				: await applyBulkPriceAdjust(ctx.user.id, adjust);
+			return { changes };
 		}),
 
 	delete: protectedProcedure

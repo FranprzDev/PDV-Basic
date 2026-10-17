@@ -404,3 +404,37 @@ describe("orders.cancel", () => {
 		expect(must(detail).orderItems.length).toBe(1);
 	});
 });
+
+describe("orders.create — precio mayorista", () => {
+	it("cobra el precio mayorista cuando la cantidad alcanza el mínimo", async () => {
+		const product = await createProduct("user-1", {
+			name: "Por mayor",
+			price: 1000,
+			in_stock: 20,
+			wholesale_price: 800,
+			wholesale_min_qty: 6,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 6 }],
+		});
+		expect(order.total_amount).toBe(4800);
+	});
+
+	it("cobra el precio común por debajo del mínimo", async () => {
+		const product = await createProduct("user-1", {
+			name: "Por menor",
+			price: 1000,
+			in_stock: 20,
+			wholesale_price: 800,
+			wholesale_min_qty: 6,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 5 }],
+		});
+		expect(order.total_amount).toBe(5000);
+	});
+});
