@@ -31,8 +31,9 @@ import {
 } from "@finopenpos/ui/components/select";
 import { Skeleton } from "@finopenpos/ui/components/skeleton";
 import { useForm } from "@tanstack/react-form";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	BanIcon,
 	EyeIcon,
 	FilePenIcon,
 	ShoppingCartIcon,
@@ -49,7 +50,8 @@ import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency } from "@/lib/utils";
 
 type Order = RouterOutputs["orders"]["list"][number];
-type OrderStatus = "completed" | "pending";
+/** Estados que el formulario de edición puede asignar (anular es otra acción). */
+type EditableStatus = "completed" | "pending";
 
 export default function OrdersPage() {
 	const trpc = useTRPC();
@@ -71,6 +73,7 @@ export default function OrdersPage() {
 		{ label: tc("all"), value: "all" },
 		{ label: tc("completed"), value: "completed", variant: "success" },
 		{ label: tc("pending"), value: "pending", variant: "warning" },
+		{ label: tc("cancelled"), value: "cancelled", variant: "danger" },
 	];
 
 	const tableColumns: Column<Order>[] = [
@@ -95,8 +98,18 @@ export default function OrdersPage() {
 			sortable: true,
 			render: (row) => {
 				const s = row.status ?? "pending";
-				const color = s === "completed" ? "text-green-600" : "text-yellow-600";
-				const label = s === "completed" ? tc("completed") : tc("pending");
+				const color =
+					s === "completed"
+						? "text-green-600"
+						: s === "cancelled"
+							? "text-red-600"
+							: "text-yellow-600";
+				const label =
+					s === "completed"
+						? tc("completed")
+						: s === "cancelled"
+							? tc("cancelled")
+							: tc("pending");
 				return <span className={color}>{label}</span>;
 			},
 		},
@@ -139,12 +152,15 @@ export default function OrdersPage() {
 
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+	const [isCancelOpen, setIsCancelOpen] = useState(false);
 	const [editingId, setEditingId] = useState<number | null>(null);
 	const [deleteId, setDeleteId] = useState<number | null>(null);
+	const [cancelId, setCancelId] = useState<number | null>(null);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState("all");
 	const [editCustomerName, setEditCustomerName] = useState("");
 
+	const queryClient = useQueryClient();
 	const invalidateKeys = trpc.orders.list.queryOptions().queryKey;
 
 	const updateMutation = useCrudMutation({
@@ -162,8 +178,21 @@ export default function OrdersPage() {
 		errorMessage: t("deleteError"),
 	});
 
+	// Anular mueve stock (se reintegra) y registra el reintegro del pago.
+	const cancelMutation = useCrudMutation({
+		mutationOptions: trpc.orders.cancel.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries(trpc.products.list.queryOptions());
+				queryClient.invalidateQueries(trpc.transactions.list.queryOptions());
+			},
+		}),
+		invalidateKeys,
+		successMessage: t("cancelledSuccessfully"),
+		errorMessage: t("cancelError"),
+	});
+
 	const form = useForm({
-		defaultValues: { total: "", status: "pending" as OrderStatus },
+		defaultValues: { total: "", status: "pending" as EditableStatus },
 		validators: {
 			onSubmit: orderEditSchema,
 		},
@@ -194,7 +223,10 @@ export default function OrdersPage() {
 		setEditCustomerName(o.customer?.name ?? "");
 		form.reset();
 		form.setFieldValue("total", (o.total_amount / 100).toString());
-		form.setFieldValue("status", (o.status ?? "pending") as OrderStatus);
+		form.setFieldValue(
+			"status",
+			o.status === "completed" ? "completed" : "pending",
+		);
 		setIsDialogOpen(true);
 	};
 
@@ -206,11 +238,30 @@ export default function OrdersPage() {
 		}
 	};
 
+	const handleCancel = () => {
+		if (cancelId !== null) {
+			cancelMutation.mutate({ id: cancelId });
+			setIsCancelOpen(false);
+			setCancelId(null);
+		}
+	};
+
 	const actionsColumn: Column<Order> = {
 		key: "actions",
 		header: tc("actions"),
 		render: (row) => (
 			<TableActions>
+				{row.status !== "cancelled" && (
+					<TableActionButton
+						variant="danger"
+						onClick={() => {
+							setCancelId(row.id);
+							setIsCancelOpen(true);
+						}}
+						icon={<BanIcon className="h-4 w-4" />}
+						label={t("cancelOrder")}
+					/>
+				)}
 				<TableActionButton
 					onClick={() => openEdit(row)}
 					icon={<FilePenIcon className="h-4 w-4" />}
@@ -359,7 +410,7 @@ export default function OrdersPage() {
 										<Select
 											value={field.state.value}
 											onValueChange={(value) =>
-												field.handleChange(value as OrderStatus)
+												field.handleChange(value as EditableStatus)
 											}
 										>
 											<SelectTrigger id="status" className="col-span-3">
@@ -396,6 +447,15 @@ export default function OrdersPage() {
 				onOpenChange={setIsDeleteOpen}
 				onConfirm={handleDelete}
 				description={t("deleteMessage")}
+			/>
+
+			<DeleteConfirmationDialog
+				open={isCancelOpen}
+				onOpenChange={setIsCancelOpen}
+				onConfirm={handleCancel}
+				title={t("cancelOrder")}
+				description={t("cancelMessage")}
+				confirmLabel={t("cancelOrder")}
 			/>
 		</Card>
 	);

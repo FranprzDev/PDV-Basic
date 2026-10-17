@@ -7,7 +7,7 @@ import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
 import { customerMap } from "./customers";
 import { loadProduct, type ProductEvent, productMap } from "./products";
 import { eventStore, STREAM } from "./store";
-import type { TransactionEvent } from "./transactions";
+import { listTransactions, type TransactionEvent } from "./transactions";
 
 // ── Eventos ─────────────────────────────────────────────────────────────────
 export interface OrderItemData {
@@ -31,6 +31,7 @@ export interface OrderUpdatedData {
 export type OrderEvent =
 	| DomainEvent<"OrderPlaced", OrderPlacedData>
 	| DomainEvent<"OrderUpdated", OrderUpdatedData>
+	| DomainEvent<"OrderCancelled", Record<string, never>>
 	| DomainEvent<"OrderDeleted", Record<string, never>>;
 
 // ── Estado ──────────────────────────────────────────────────────────────────
@@ -72,6 +73,8 @@ export function orderReducer(
 				...(d.status !== undefined ? { status: d.status } : {}),
 			};
 		}
+		case "OrderCancelled":
+			return state ? { ...state, status: "cancelled" } : state;
 		case "OrderDeleted":
 			return undefined;
 		default:
@@ -176,7 +179,8 @@ export interface PlaceOrderInput {
 export type OrderErrorCode =
 	| "invalid_quantity"
 	| "product_not_found"
-	| "insufficient_stock";
+	| "insufficient_stock"
+	| "not_cancellable";
 
 /** Error de negocio de una venta: el router lo traduce a un código tRPC. */
 export class OrderError extends Error {
@@ -352,4 +356,102 @@ export async function deleteOrder(userUid: string, id: number): Promise<void> {
 		userUid,
 		events: [{ type: "OrderDeleted", data: {} }],
 	});
+}
+
+/**
+ * Anula una venta como un hecho nuevo (nunca se edita el pasado): en un único
+ * append atómico `OrderCancelled` marca el pedido, `StockRestocked` reintegra
+ * las unidades que la venta había descontado y `TransactionRecorded` con
+ * importe negativo revierte el pago en el mismo medio.
+ *
+ * A diferencia de borrar, la venta y su pago siguen en el log: queda auditado.
+ */
+export async function cancelOrder(
+	userUid: string,
+	id: number,
+): Promise<OrderWithCustomer | undefined> {
+	const { state, version } = await loadOrder(id);
+	if (!state || state.user_uid !== userUid) return undefined;
+	if (state.status === "cancelled") {
+		throw new OrderError("not_cancellable", `La venta #${id} ya está anulada.`);
+	}
+
+	// Se devuelve exactamente lo que la venta descontó, agregado por producto.
+	const restock = new Map<number, number>();
+	for (const item of state.items) {
+		restock.set(
+			item.product_id,
+			(restock.get(item.product_id) ?? 0) + item.quantity,
+		);
+	}
+
+	const stockStreams: StreamAppend<
+		OrderEvent | TransactionEvent | ProductEvent
+	>[] = [];
+	for (const [productId, quantity] of restock) {
+		const { state: product, version: productVersion } =
+			await loadProduct(productId);
+		// Si el producto ya no existe no hay dónde reintegrar: se omite.
+		if (!product || product.user_uid !== userUid) continue;
+		stockStreams.push({
+			streamType: STREAM.product,
+			streamId: productId,
+			expectedVersion: productVersion,
+			events: [{ type: "StockRestocked", data: { quantity } }],
+		});
+	}
+
+	// El reintegro va al mismo medio de pago que cobró la venta original.
+	const transactions = await listTransactions(userUid);
+	const original = transactions.find(
+		(t) => t.order_id === id && t.category !== "refund",
+	);
+
+	const streams: StreamAppend<OrderEvent | TransactionEvent | ProductEvent>[] =
+		[
+			{
+				streamType: STREAM.order,
+				streamId: id,
+				expectedVersion: version,
+				events: [{ type: "OrderCancelled", data: {} }],
+			},
+			...stockStreams,
+		];
+
+	// Si la venta nunca generó una transacción (p. ej. un pedido pendiente), no
+	// hay dinero que revertir: sólo se anula y se reintegra el stock.
+	if (original) {
+		streams.push({
+			streamType: STREAM.transaction,
+			streamId: await eventStore.nextStreamId(STREAM.transaction),
+			expectedVersion: 0,
+			events: [
+				{
+					type: "TransactionRecorded",
+					data: {
+						order_id: id,
+						payment_method_id: original.payment_method_id ?? undefined,
+						amount: -state.total_amount,
+						status: "completed",
+						category: "refund",
+						type: "income",
+						description: `Anulación de venta #${id}`,
+					},
+				},
+			],
+		});
+	}
+
+	const stored = await eventStore.appendMany<
+		OrderEvent | TransactionEvent | ProductEvent
+	>(streams, { userUid });
+
+	const cancelled = stored.find(
+		(event) => event.streamType === STREAM.order && event.streamId === id,
+	);
+	if (!cancelled) throw new Error("unreachable: cancel event was not stored");
+	const next = orderReducer(state, cancelled as StoredEvent<OrderEvent>);
+	if (!next) throw new Error("unreachable: cancel produced no state");
+	const customers = await customerMap(userUid);
+	return toOrderWithCustomer(next, customers);
 }
