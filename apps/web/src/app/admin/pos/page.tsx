@@ -270,9 +270,7 @@ export default function POSPage() {
 			products: selectedProducts.map((p) => ({
 				id: p.id,
 				quantity: p.quantity,
-				price: p.price,
 			})),
-			total,
 		});
 	};
 

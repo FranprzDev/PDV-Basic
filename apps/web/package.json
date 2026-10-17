@@ -11,8 +11,8 @@
 		"db:push": "drizzle-kit push",
 		"db:seed": "bun scripts/seed.ts",
 		"check-types": "tsc --noEmit",
-		"test": "bun test src/lib",
-		"test:coverage": "bun test --coverage src/lib"
+		"test": "bun run db:ensure && bun test src/lib",
+		"test:coverage": "bun run db:ensure && bun test --coverage src/lib"
 	},
 	"dependencies": {
 		"@electric-sql/pglite": "^0.3.15",

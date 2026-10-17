@@ -11,6 +11,8 @@ reworked for the local market.
 - **Barcodes** on products, scanned with a USB gun.
 - **Fast sale**: configurable keyboard shortcuts in the POS (F2 search, F9 confirm,
   +/- quantity, Del remove, Esc clear) plus cash count by payment method with chart.
+- **Stock that moves**: the server prices the cart from the catalog and decrements
+  stock in the same atomic fact as the order and the payment.
 - **Quick actions** panel: new sale, new product, new customer, cash movements,
   scan-to-price.
 - **Thermal printer**: own ESC/POS protocol, no libraries, with accent support.

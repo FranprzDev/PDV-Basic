@@ -4,6 +4,7 @@ import {
 	type DomainEvent,
 	type ReadOptions,
 	type StoredEvent,
+	type StreamAppend,
 } from "./types";
 
 /**
@@ -103,15 +104,57 @@ export class EventStore {
 		return Number(res.rows[0]?.next ?? 1);
 	}
 
-	/** Grava eventos de um comando atomicamente (um INSERT multi-row). */
+	/** Grava eventos de um único stream (atalho para `appendMany`). */
 	async append<TEvent extends DomainEvent>(
 		input: AppendInput<TEvent>,
 	): Promise<StoredEvent<TEvent>[]> {
-		if (input.events.length === 0) return [];
+		return this.appendMany<TEvent>(
+			[
+				{
+					streamType: input.streamType,
+					streamId: input.streamId,
+					expectedVersion: input.expectedVersion,
+					events: input.events,
+				},
+			],
+			{ userUid: input.userUid, occurredAt: input.occurredAt },
+		);
+	}
+
+	/**
+	 * Grava eventos de um ou mais streams em um único INSERT — tudo grava ou
+	 * nada grava. É o que permite tratar um comando que toca vários agregados
+	 * (ex.: venda = pedido + baixa de estoque + pagamento) como um só fato.
+	 *
+	 * Cada stream declara sua versão esperada: se qualquer um deles tiver
+	 * mudado no meio-tempo, o UNIQUE (stream_type, stream_id, version) rejeita
+	 * o INSERT inteiro e lançamos `ConcurrencyError`.
+	 */
+	async appendMany<TEvent extends DomainEvent>(
+		streams: StreamAppend<TEvent>[],
+		meta: { userUid: string; occurredAt?: Date },
+	): Promise<StoredEvent<TEvent>[]> {
+		const rows: {
+			streamType: string;
+			streamId: number;
+			version: number;
+			event: TEvent;
+		}[] = [];
+		for (const stream of streams) {
+			stream.events.forEach((event, i) => {
+				rows.push({
+					streamType: stream.streamType,
+					streamId: stream.streamId,
+					version: stream.expectedVersion + i + 1,
+					event,
+				});
+			});
+		}
+		if (rows.length === 0) return [];
 
 		const values: string[] = [];
 		const params: unknown[] = [];
-		input.events.forEach((event, i) => {
+		for (const row of rows) {
 			const base = params.length;
 			const cols = [
 				`$${base + 1}`,
@@ -121,20 +164,20 @@ export class EventStore {
 				`$${base + 5}`,
 				`$${base + 6}`,
 			];
-			if (input.occurredAt) cols.push(`$${base + 7}`);
+			if (meta.occurredAt) cols.push(`$${base + 7}`);
 			values.push(`(${cols.join(", ")})`);
 			params.push(
-				input.streamType,
-				input.streamId,
-				input.expectedVersion + i + 1,
-				event.type,
-				JSON.stringify(event.data),
-				input.userUid,
+				row.streamType,
+				row.streamId,
+				row.version,
+				row.event.type,
+				JSON.stringify(row.event.data),
+				meta.userUid,
 			);
-			if (input.occurredAt) params.push(input.occurredAt.toISOString());
-		});
+			if (meta.occurredAt) params.push(meta.occurredAt.toISOString());
+		}
 
-		const columns = input.occurredAt
+		const columns = meta.occurredAt
 			? "(stream_type, stream_id, version, event_type, payload, user_uid, occurred_at)"
 			: "(stream_type, stream_id, version, event_type, payload, user_uid)";
 
@@ -154,11 +197,17 @@ export class EventStore {
 			return stored;
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				throw new ConcurrencyError(
-					input.streamType,
-					input.streamId,
-					input.expectedVersion,
-				);
+				// O Postgres não informa qual stream colidiu: reportamos o
+				// primeiro do comando. A colisão é rara (PGlite é single-writer)
+				// e o chamador reexecuta o comando inteiro de qualquer forma.
+				const first = streams.find((s) => s.events.length > 0);
+				if (first) {
+					throw new ConcurrencyError(
+						first.streamType,
+						first.streamId,
+						first.expectedVersion,
+					);
+				}
 			}
 			throw err;
 		}

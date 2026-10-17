@@ -17,9 +17,15 @@ export interface ProductCreatedData {
 
 export type ProductUpdatedData = Partial<ProductCreatedData>;
 
+/** Baixa de estoque: unidades que saem por uma venda. */
+export interface StockDecrementedData {
+	quantity: number;
+}
+
 export type ProductEvent =
 	| DomainEvent<"ProductCreated", ProductCreatedData>
 	| DomainEvent<"ProductUpdated", ProductUpdatedData>
+	| DomainEvent<"StockDecremented", StockDecrementedData>
 	| DomainEvent<"ProductDeleted", Record<string, never>>;
 
 // ── Estado (mesma forma do contrato da API) ─────────────────────────────────
@@ -76,6 +82,11 @@ export function productReducer(
 			return state
 				? { ...state, ...definedOnly(event.data as ProductUpdatedData) }
 				: state;
+		case "StockDecremented": {
+			if (!state) return state;
+			const d = event.data as StockDecrementedData;
+			return { ...state, in_stock: Math.max(0, state.in_stock - d.quantity) };
+		}
 		case "ProductDeleted":
 			return undefined;
 		default:

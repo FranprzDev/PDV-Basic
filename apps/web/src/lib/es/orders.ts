@@ -1,9 +1,13 @@
-import type { DomainEvent, StoredEvent } from "@finopenpos/event-sourcing";
+import type {
+	DomainEvent,
+	StoredEvent,
+	StreamAppend,
+} from "@finopenpos/event-sourcing";
 import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
 import { customerMap } from "./customers";
-import { productMap } from "./products";
+import { loadProduct, type ProductEvent, productMap } from "./products";
 import { eventStore, STREAM } from "./store";
-import { recordTransaction } from "./transactions";
+import type { TransactionEvent } from "./transactions";
 
 // ── Eventos ─────────────────────────────────────────────────────────────────
 export interface OrderItemData {
@@ -157,56 +161,156 @@ export async function loadOrder(
 }
 
 // ── Comandos ────────────────────────────────────────────────────────────────
+export interface PlaceOrderItemInput {
+	product_id: number;
+	quantity: number;
+}
+
 export interface PlaceOrderInput {
 	/** null en compra de mostrador, sin cliente registrado. */
 	customerId: number | null;
 	paymentMethodId: number;
-	products: OrderItemData[];
-	total: number;
+	products: PlaceOrderItemInput[];
+}
+
+export type OrderErrorCode =
+	| "invalid_quantity"
+	| "product_not_found"
+	| "insufficient_stock";
+
+/** Error de negocio de una venta: el router lo traduce a un código tRPC. */
+export class OrderError extends Error {
+	constructor(
+		readonly code: OrderErrorCode,
+		message: string,
+	) {
+		super(message);
+		this.name = "OrderError";
+	}
 }
 
 /**
- * Fluxo de venda do POS: um pedido gera dois fatos — OrderPlaced no stream
- * do pedido e TransactionRecorded no stream financeiro.
+ * Fluxo de venda do POS: um pedido é um só fato que toca três agregados —
+ * `OrderPlaced` (pedido), `StockDecremented` por ítem (estoque) e
+ * `TransactionRecorded` (pago) — gravados num único append atómico.
+ *
+ * O preço e o total saem do catálogo do servidor: o cliente só manda o que e
+ * quanto. O estoque é validado e baixado aqui, não no navegador.
  */
 export async function placeOrder(
 	userUid: string,
 	input: PlaceOrderInput,
 ): Promise<OrderWithCustomer> {
-	const id = await eventStore.nextStreamId(STREAM.order);
-	const [stored] = await eventStore.append<OrderEvent>({
-		streamType: STREAM.order,
-		streamId: id,
-		expectedVersion: 0,
-		userUid,
-		events: [
+	if (input.products.length === 0) {
+		throw new OrderError(
+			"invalid_quantity",
+			"La venta necesita al menos un producto.",
+		);
+	}
+
+	// Cantidad por producto: el POS no manda duplicados, pero la API es pública.
+	const requested = new Map<number, number>();
+	for (const p of input.products) {
+		if (!Number.isInteger(p.quantity) || p.quantity <= 0) {
+			throw new OrderError(
+				"invalid_quantity",
+				`Cantidad inválida para el producto ${p.product_id}.`,
+			);
+		}
+		requested.set(
+			p.product_id,
+			(requested.get(p.product_id) ?? 0) + p.quantity,
+		);
+	}
+
+	const catalog = await productMap(userUid);
+	const items: OrderItemData[] = [];
+	const stockStreams: StreamAppend<
+		OrderEvent | TransactionEvent | ProductEvent
+	>[] = [];
+
+	for (const [productId, quantity] of requested) {
+		const product = catalog.get(productId);
+		if (!product) {
+			throw new OrderError(
+				"product_not_found",
+				`El producto ${productId} no existe.`,
+			);
+		}
+		if (quantity > product.in_stock) {
+			throw new OrderError(
+				"insufficient_stock",
+				`Stock insuficiente de ${product.name}: quedan ${product.in_stock}.`,
+			);
+		}
+
+		const { version } = await loadProduct(productId);
+		items.push({ product_id: productId, quantity, price: product.price });
+		stockStreams.push({
+			streamType: STREAM.product,
+			streamId: productId,
+			expectedVersion: version,
+			events: [{ type: "StockDecremented", data: { quantity } }],
+		});
+	}
+
+	const total = items.reduce(
+		(sum, item) => sum + item.price * item.quantity,
+		0,
+	);
+	const orderId = await eventStore.nextStreamId(STREAM.order);
+	const transactionId = await eventStore.nextStreamId(STREAM.transaction);
+
+	// Un solo INSERT: pedido + baixa de estoque + pago. Tudo grava ou nada grava.
+	const stored = await eventStore.appendMany<
+		OrderEvent | TransactionEvent | ProductEvent
+	>(
+		[
 			{
-				type: "OrderPlaced",
-				data: {
-					customer_id: input.customerId,
-					total_amount: input.total,
-					status: "completed",
-					items: input.products.map((p) => ({
-						product_id: p.product_id,
-						quantity: p.quantity,
-						price: p.price,
-					})),
-				},
+				streamType: STREAM.order,
+				streamId: orderId,
+				expectedVersion: 0,
+				events: [
+					{
+						type: "OrderPlaced",
+						data: {
+							customer_id: input.customerId,
+							total_amount: total,
+							status: "completed",
+							items,
+						},
+					},
+				],
+			},
+			...stockStreams,
+			{
+				streamType: STREAM.transaction,
+				streamId: transactionId,
+				expectedVersion: 0,
+				events: [
+					{
+						type: "TransactionRecorded",
+						data: {
+							order_id: orderId,
+							payment_method_id: input.paymentMethodId,
+							amount: total,
+							status: "completed",
+							category: "selling",
+							type: "income",
+							description: `Payment for order #${orderId}`,
+						},
+					},
+				],
 			},
 		],
-	});
+		{ userUid },
+	);
 
-	await recordTransaction(userUid, {
-		order_id: id,
-		payment_method_id: input.paymentMethodId,
-		amount: input.total,
-		status: "completed",
-		category: "selling",
-		type: "income",
-		description: `Payment for order #${id}`,
-	});
-
-	const state = orderReducer(undefined, stored as StoredEvent<OrderEvent>);
+	const placed = stored.find(
+		(event) => event.streamType === STREAM.order && event.streamId === orderId,
+	);
+	if (!placed) throw new Error("unreachable: order event was not stored");
+	const state = orderReducer(undefined, placed as StoredEvent<OrderEvent>);
 	if (!state) throw new Error("unreachable: create produced no state");
 	const customers = await customerMap(userUid);
 	return toOrderWithCustomer(state, customers);

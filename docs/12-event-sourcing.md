@@ -74,8 +74,8 @@ apps/web/src/lib/es/*              (write side)   (read side)
   products / customers / orders /   comandos +     projeções: readAll +
   transactions / payment-methods    reducers       foldStreams por request
         ▼
-packages/event-sourcing            EventStore (append, readStream, readAll,
-                                   nextStreamId), foldStream(s), tipos
+packages/event-sourcing            EventStore (append, appendMany, readStream,
+                                   readAll, nextStreamId), foldStream(s), tipos
         ▼
 tabela `events` (PGlite)           global_seq | stream_type | stream_id |
                                    version | event_type | payload(text) |
@@ -86,7 +86,7 @@ tabela `events` (PGlite)           global_seq | stream_type | stream_id |
 
 | Stream | Eventos |
 |---|---|
-| `product` | `ProductCreated`, `ProductUpdated`, `ProductDeleted` |
+| `product` | `ProductCreated`, `ProductUpdated`, `StockDecremented`, `ProductDeleted` |
 | `customer` | `CustomerCreated`, `CustomerUpdated`, `CustomerDeleted` |
 | `order` | `OrderPlaced` (com itens embutidos), `OrderUpdated`, `OrderDeleted` |
 | `transaction` | `TransactionRecorded`, `TransactionUpdated`, `TransactionDeleted` |
@@ -97,9 +97,16 @@ Observações:
 - Os **itens do pedido** são parte do fato `OrderPlaced` (um pedido é
   colocado com seus itens — não existem eventos por item). O `id` de item
   exposto na API é sintético e estável (`order_id * 1000 + índice + 1`).
-- A venda no POS gera **dois fatos**: `OrderPlaced` + `TransactionRecorded`
-  (pagamento). Deletar o pedido **não apaga** a transação — fatos históricos
-  permanecem no log.
+- A venda no POS é **um só comando atômico** que grava em três agregados:
+  `OrderPlaced` (pedido), `StockDecremented` por ítem (estoque) e
+  `TransactionRecorded` (pago) — tudo num único `appendMany` (um INSERT). Se
+  qualquer stream tiver mudado no meio-tempo, o comando inteiro é rejeitado.
+- O **preço e o total saem do catálogo do servidor**; o cliente só manda o que
+  e quanto. O estoque é validado e baixado como parte do mesmo fato — o POS não
+  é a autoridade sobre preço nem sobre disponibilidade.
+- Deletar o pedido **não apaga** a transação nem devolve o estoque — fatos
+  históricos permanecem no log. A anulação com reingresso é um evento novo
+  (pendente), não uma edição do passado.
 - `deleted` é um evento como outro qualquer: o reducer devolve `undefined`
   e a projeção remove a entidade do read model. O histórico continua
   disponível para auditoria/replay.
@@ -116,6 +123,10 @@ Observações:
 - Nome de método de pagamento único — idem.
 - Escopo por usuário: comandos verificam `user_uid` do stream antes de
   gravar; queries filtram eventos por `user_uid` no SQL.
+- Preço e total de uma venda: calculados no servidor a partir do catálogo,
+  nunca aceitos do cliente.
+- Estoque: a venda só passa se houver `in_stock` suficiente de cada produto;
+  a baixa entra no mesmo append atômico do pedido e do pagamento.
 
 ## Referências
 
