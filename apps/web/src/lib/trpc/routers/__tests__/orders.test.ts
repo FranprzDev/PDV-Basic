@@ -307,3 +307,100 @@ describe("orders.delete", () => {
 		expect(after.length).toBe(before.length);
 	});
 });
+
+describe("orders.cancel", () => {
+	it("marks the order cancelled, restores stock and reverses the payment", async () => {
+		const product = await createProduct("user-1", {
+			name: "Cancel Me",
+			price: 500,
+			in_stock: 10,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 4 }],
+		});
+		expect(await stockOf(product.id)).toBe(6);
+
+		const cancelled = await caller.cancel({ id: order.id });
+		expect(cancelled.status).toBe("cancelled");
+		expect(await stockOf(product.id)).toBe(10);
+
+		const txns = (await listTransactions("user-1")).filter(
+			(t) => t.order_id === order.id,
+		);
+		// El pago original sigue en el log; se agrega el reintegro en negativo.
+		expect(txns.length).toBe(2);
+		const original = must(txns.find((t) => t.category !== "refund"));
+		const refund = must(txns.find((t) => t.category === "refund"));
+		expect(original.amount).toBe(2000);
+		expect(refund.amount).toBe(-2000);
+		expect(refund.payment_method_id).toBe(original.payment_method_id);
+	});
+
+	it("is idempotent — a second cancel fails and does not double the stock", async () => {
+		const product = await createProduct("user-1", {
+			name: "Once Only",
+			price: 100,
+			in_stock: 5,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 2 }],
+		});
+		await caller.cancel({ id: order.id });
+		await expect(caller.cancel({ id: order.id })).rejects.toThrow();
+
+		expect(await stockOf(product.id)).toBe(5);
+		const refunds = (await listTransactions("user-1")).filter(
+			(t) => t.order_id === order.id && t.category === "refund",
+		);
+		expect(refunds.length).toBe(1);
+	});
+
+	it("persists the cancelled status in list()", async () => {
+		const product = await createProduct("user-1", {
+			name: "Listed",
+			price: 250,
+			in_stock: 3,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 1 }],
+		});
+		await caller.cancel({ id: order.id });
+
+		const list = await caller.list();
+		const persisted = must(list.find((o) => o.id === order.id));
+		expect(persisted.status).toBe("cancelled");
+	});
+
+	it("refuses to cancel another user's order", async () => {
+		const other = callerAs("outsider");
+		await expect(other.cancel({ id: 1 })).rejects.toThrow();
+	});
+
+	it("returns NOT_FOUND for a non-existent order", async () => {
+		await expect(caller.cancel({ id: 999999 })).rejects.toThrow();
+	});
+
+	it("keeps the order read model without items after cancel", async () => {
+		const product = await createProduct("user-1", {
+			name: "Still Detailed",
+			price: 300,
+			in_stock: 2,
+		});
+		const order = await caller.create({
+			customerId,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 1 }],
+		});
+		await caller.cancel({ id: order.id });
+
+		const detail = await caller.get({ id: order.id });
+		expect(must(detail).status).toBe("cancelled");
+		expect(must(detail).orderItems.length).toBe(1);
+	});
+});

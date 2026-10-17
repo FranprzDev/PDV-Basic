@@ -86,9 +86,9 @@ tabla `events` (PGlite)            global_seq | stream_type | stream_id |
 
 | Stream | Eventos |
 |---|---|
-| `product` | `ProductCreated`, `ProductUpdated`, `StockDecremented`, `ProductDeleted` |
+| `product` | `ProductCreated`, `ProductUpdated`, `StockDecremented`, `StockRestocked`, `ProductDeleted` |
 | `customer` | `CustomerCreated`, `CustomerUpdated`, `CustomerDeleted` |
-| `order` | `OrderPlaced` (con ítems embebidos), `OrderUpdated`, `OrderDeleted` |
+| `order` | `OrderPlaced` (con ítems embebidos), `OrderUpdated`, `OrderCancelled`, `OrderDeleted` |
 | `transaction` | `TransactionRecorded`, `TransactionUpdated`, `TransactionDeleted` |
 | `payment_method` | `PaymentMethodCreated`, `PaymentMethodRenamed`, `PaymentMethodDeleted` |
 
@@ -105,8 +105,10 @@ Observaciones:
   y cuánto. El stock se valida y se descuenta como parte del mismo hecho — el POS no
   es la autoridad sobre el precio ni sobre la disponibilidad.
 - Borrar el pedido **no borra** la transacción ni devuelve el stock — los hechos
-  históricos permanecen en el log. La anulación con reingreso es un evento nuevo
-  (pendiente), no una edición del pasado.
+  históricos permanecen en el log. Anular es distinto y explícito: un comando
+  atómico que graba `OrderCancelled` + `StockRestocked` por ítem y un
+  `TransactionRecorded` con importe negativo (categoría `refund`) en el mismo
+  medio de pago. Nada se edita: se agregan hechos nuevos.
 - `deleted` es un evento como cualquier otro: el reducer devuelve `undefined`
   y la proyección elimina la entidad del read model. El historial sigue
   disponible para auditoría/replay.
@@ -127,6 +129,9 @@ Observaciones:
   nunca aceptados del cliente.
 - Stock: la venta solo pasa si hay `in_stock` suficiente de cada producto;
   la baja entra en el mismo append atómico del pedido y del pago.
+- Anulación: una venta anulada devuelve exactamente las unidades que descontó
+  y revierte el pago con una transacción negativa; reintentar la anulación se
+  rechaza (no se reintegra dos veces).
 
 ## Referencias
 

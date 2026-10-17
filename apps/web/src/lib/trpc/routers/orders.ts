@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 import {
+	cancelOrder,
 	deleteOrder,
 	getOrderDetail,
 	listOrders,
@@ -14,6 +15,7 @@ const ORDER_ERROR_CODES = {
 	invalid_quantity: "BAD_REQUEST",
 	product_not_found: "NOT_FOUND",
 	insufficient_stock: "CONFLICT",
+	not_cancellable: "CONFLICT",
 } as const;
 
 const orderWithCustomerSchema = z.object({
@@ -111,6 +113,25 @@ export const ordersRouter = router({
 			const updated = await updateOrder(ctx.user.id, id, data);
 			if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
 			return updated;
+		}),
+
+	cancel: protectedProcedure
+		.input(z.object({ id: z.number() }))
+		.output(orderWithCustomerSchema)
+		.mutation(async ({ ctx, input }) => {
+			const cancelled = await cancelOrder(ctx.user.id, input.id).catch(
+				(err: unknown) => {
+					if (err instanceof OrderError) {
+						throw new TRPCError({
+							code: ORDER_ERROR_CODES[err.code],
+							message: err.message,
+						});
+					}
+					throw err;
+				},
+			);
+			if (!cancelled) throw new TRPCError({ code: "NOT_FOUND" });
+			return cancelled;
 		}),
 
 	delete: protectedProcedure

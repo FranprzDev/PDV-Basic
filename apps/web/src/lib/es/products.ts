@@ -22,10 +22,16 @@ export interface StockDecrementedData {
 	quantity: number;
 }
 
+/** Alta de stock: unidades que vuelven por una anulación. */
+export interface StockRestockedData {
+	quantity: number;
+}
+
 export type ProductEvent =
 	| DomainEvent<"ProductCreated", ProductCreatedData>
 	| DomainEvent<"ProductUpdated", ProductUpdatedData>
 	| DomainEvent<"StockDecremented", StockDecrementedData>
+	| DomainEvent<"StockRestocked", StockRestockedData>
 	| DomainEvent<"ProductDeleted", Record<string, never>>;
 
 // ── Estado (misma forma del contrato de la API) ─────────────────────────────
@@ -86,6 +92,11 @@ export function productReducer(
 			if (!state) return state;
 			const d = event.data as StockDecrementedData;
 			return { ...state, in_stock: Math.max(0, state.in_stock - d.quantity) };
+		}
+		case "StockRestocked": {
+			if (!state) return state;
+			const d = event.data as StockRestockedData;
+			return { ...state, in_stock: state.in_stock + d.quantity };
 		}
 		case "ProductDeleted":
 			return undefined;
