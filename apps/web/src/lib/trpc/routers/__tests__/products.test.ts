@@ -180,3 +180,96 @@ describe("products.delete", () => {
 		expect(list.some((x) => x.id === p.id)).toBe(false);
 	});
 });
+
+describe("products.bulkAdjust", () => {
+	const bulk = callerAs("bulk-user");
+
+	it("previsualiza sin escribir nada (dryRun)", async () => {
+		const p = await bulk.create({
+			name: "Pri",
+			price: 1000,
+			in_stock: 1,
+		});
+		const { changes } = await bulk.bulkAdjust({
+			scope: "all",
+			percent: 10,
+			dryRun: true,
+		});
+		const change = must(changes.find((c) => c.product_id === p.id));
+		expect(change.before).toBe(1000);
+		expect(change.after).toBe(1100);
+
+		const list = await bulk.list();
+		expect(must(list.find((x) => x.id === p.id)).price).toBe(1000);
+	});
+
+	it("aplica el porcentaje a todos los productos", async () => {
+		const a = await bulk.create({ name: "A", price: 1000, in_stock: 1 });
+		const b = await bulk.create({ name: "B", price: 2000, in_stock: 1 });
+		const { changes } = await bulk.bulkAdjust({ scope: "all", percent: 10 });
+		expect(changes.length).toBeGreaterThanOrEqual(2);
+
+		const list = await bulk.list();
+		expect(must(list.find((x) => x.id === a.id)).price).toBe(1100);
+		expect(must(list.find((x) => x.id === b.id)).price).toBe(2200);
+	});
+
+	it("limita el ajuste a una categoría", async () => {
+		const other = callerAs("bulk-user-cat");
+		const inCat = await other.create({
+			name: "Cat",
+			price: 1000,
+			in_stock: 1,
+			category: "bebidas",
+		});
+		const outCat = await other.create({
+			name: "NoCat",
+			price: 1000,
+			in_stock: 1,
+			category: "almacen",
+		});
+		const { changes } = await other.bulkAdjust({
+			scope: "category",
+			category: "bebidas",
+			percent: 20,
+		});
+		expect(changes.length).toBe(1);
+
+		const list = await other.list();
+		expect(must(list.find((x) => x.id === inCat.id)).price).toBe(1200);
+		expect(must(list.find((x) => x.id === outCat.id)).price).toBe(1000);
+	});
+
+	it("redondea el precio resultante", async () => {
+		const r = callerAs("bulk-user-round");
+		const p = await r.create({ name: "R", price: 333, in_stock: 1 });
+		await r.bulkAdjust({ scope: "all", percent: 10, roundTo: 100 });
+		const list = await r.list();
+		// 333 * 1.1 = 366.3 → múltiplo de 100 más cercano = 400
+		expect(must(list.find((x) => x.id === p.id)).price).toBe(400);
+	});
+
+	it("ajusta también el precio mayorista para conservar el margen", async () => {
+		const w = callerAs("bulk-user-ws");
+		const p = await w.create({
+			name: "W",
+			price: 1000,
+			in_stock: 1,
+			wholesale_price: 800,
+			wholesale_min_qty: 6,
+		});
+		await w.bulkAdjust({ scope: "all", percent: 25 });
+		const list = await w.list();
+		const updated = must(list.find((x) => x.id === p.id));
+		expect(updated.price).toBe(1250);
+		expect(updated.wholesale_price).toBe(1000);
+	});
+
+	it("no toca los productos de otro usuario", async () => {
+		const mine = callerAs("bulk-user-safe");
+		await mine.create({ name: "Safe", price: 1000, in_stock: 1 });
+		await bulk.bulkAdjust({ scope: "all", percent: 100 });
+		const list = await mine.list();
+		expect(must(list.find((x) => x.name === "Safe")).price).toBe(1000);
+	});
+});

@@ -33,7 +33,7 @@ import { useLocale, useTranslations } from "next-intl";
 import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BUSINESS_NAME } from "@/lib/config";
-import { isBelowMinimum } from "@/lib/es/products";
+import { isBelowMinimum, unitPriceFor } from "@/lib/es/products";
 import { useHotkeys } from "@/lib/hotkeys/use-hotkeys";
 import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
 import { findByBarcode } from "@/lib/scanner/barcode";
@@ -44,10 +44,16 @@ import { formatCurrency } from "@/lib/utils";
 import { HotkeySettingsButton } from "./hotkey-settings";
 
 type Product = RouterOutputs["products"]["list"][number];
-type POSProduct = Pick<Product, "id" | "name" | "price" | "in_stock"> & {
+type POSProduct = Pick<
+	Product,
+	"id" | "name" | "price" | "wholesale_price" | "wholesale_min_qty" | "in_stock"
+> & {
 	category: string;
 	quantity: number;
 };
+
+/** Precio vigente de la línea del carrito (aplica mayorista según la cantidad). */
+const lineUnitPrice = (p: POSProduct) => unitPriceFor(p, p.quantity);
 
 export default function POSPage() {
 	const trpc = useTRPC();
@@ -106,6 +112,8 @@ export default function POSPage() {
 							id: product.id,
 							name: product.name,
 							price: product.price,
+							wholesale_price: product.wholesale_price,
+							wholesale_min_qty: product.wholesale_min_qty,
 							in_stock: product.in_stock,
 							category: product.category ?? "",
 							quantity: 1,
@@ -159,7 +167,7 @@ export default function POSPage() {
 					items: selectedProducts.map((p) => ({
 						name: p.name,
 						quantity: p.quantity,
-						unitPrice: p.price,
+						unitPrice: lineUnitPrice(p),
 					})),
 					paymentMethod: paymentMethod?.name ?? "",
 					customerName: selectedCustomer?.name,
@@ -211,6 +219,8 @@ export default function POSPage() {
 					id: product.id,
 					name: product.name,
 					price: product.price,
+					wholesale_price: product.wholesale_price,
+					wholesale_min_qty: product.wholesale_min_qty,
 					in_stock: product.in_stock,
 					category: product.category ?? "",
 					quantity: 1,
@@ -255,7 +265,7 @@ export default function POSPage() {
 	};
 
 	const total = selectedProducts.reduce(
-		(sum, product) => sum + product.price * product.quantity,
+		(sum, product) => sum + lineUnitPrice(product) * product.quantity,
 		0,
 	);
 
@@ -456,7 +466,7 @@ export default function POSPage() {
 													{product.name}
 												</TableCell>
 												<TableCell className="hidden sm:table-cell">
-													{formatCurrency(product.price, locale)}
+													{formatCurrency(lineUnitPrice(product), locale)}
 												</TableCell>
 												<TableCell className="hidden md:table-cell">
 													<Badge
@@ -506,7 +516,7 @@ export default function POSPage() {
 												</TableCell>
 												<TableCell className="font-medium">
 													{formatCurrency(
-														product.quantity * product.price,
+														product.quantity * lineUnitPrice(product),
 														locale,
 													)}
 												</TableCell>

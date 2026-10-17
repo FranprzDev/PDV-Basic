@@ -32,10 +32,17 @@ import {
 } from "@finopenpos/ui/components/select";
 import { Skeleton } from "@finopenpos/ui/components/skeleton";
 import { useForm } from "@tanstack/react-form";
-import { useQuery } from "@tanstack/react-query";
-import { FilePenIcon, PackageIcon, PlusIcon, TrashIcon } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+	FilePenIcon,
+	PackageIcon,
+	PlusIcon,
+	TagsIcon,
+	TrashIcon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod/v4";
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog";
 import { useCrudMutation } from "@/hooks/use-crud-mutation";
@@ -45,6 +52,7 @@ import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency } from "@/lib/utils";
 
 type Product = RouterOutputs["products"]["list"][number];
+type PriceChange = RouterOutputs["products"]["bulkAdjust"]["changes"][number];
 
 export default function Products() {
 	const trpc = useTRPC();
@@ -61,6 +69,8 @@ export default function Products() {
 		price: z.number().min(0, t("priceMustBePositive")),
 		in_stock: z.number().int().min(0, t("stockMustBeNonNegative")),
 		min_stock: z.number().int().min(0, t("stockMustBeNonNegative")),
+		wholesale_price: z.number().min(0, t("priceMustBePositive")),
+		wholesale_min_qty: z.number().int().min(0, t("stockMustBeNonNegative")),
 		barcode: z.string(),
 		category: z.string(),
 		unit_of_measure: z.string(),
@@ -94,6 +104,17 @@ export default function Products() {
 			sortable: true,
 			accessorFn: (row) => row.price,
 			render: (row) => formatCurrency(row.price, locale),
+		},
+		{
+			key: "wholesale_price",
+			header: t("wholesalePrice"),
+			sortable: true,
+			hideOnMobile: true,
+			accessorFn: (row) => row.wholesale_price ?? 0,
+			render: (row) =>
+				row.wholesale_price === null
+					? "—"
+					: formatCurrency(row.wholesale_price, locale),
 		},
 		{ key: "in_stock", header: t("stock"), sortable: true },
 		{
@@ -132,11 +153,17 @@ export default function Products() {
 
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+	const [isBulkOpen, setIsBulkOpen] = useState(false);
 	const [editingId, setEditingId] = useState<number | null>(null);
 	const [deleteId, setDeleteId] = useState<number | null>(null);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [categoryFilter, setCategoryFilter] = useState("all");
 	const [stockFilter, setStockFilter] = useState("all");
+	const [bulkScope, setBulkScope] = useState<"all" | "category">("all");
+	const [bulkCategory, setBulkCategory] = useState("");
+	const [bulkPercent, setBulkPercent] = useState("");
+	const [bulkRoundTo, setBulkRoundTo] = useState("0");
+	const [bulkPreview, setBulkPreview] = useState<PriceChange[] | null>(null);
 
 	const isEditing = editingId !== null;
 	const invalidateKeys = trpc.products.list.queryOptions().queryKey;
@@ -164,6 +191,25 @@ export default function Products() {
 		errorMessage: t("deleteError"),
 	});
 
+	const previewMutation = useMutation(
+		trpc.products.bulkAdjust.mutationOptions({
+			onSuccess: (data) => setBulkPreview(data.changes),
+			onError: (err) => toast.error(err.message || t("bulkError")),
+		}),
+	);
+
+	const applyMutation = useCrudMutation({
+		mutationOptions: trpc.products.bulkAdjust.mutationOptions(),
+		invalidateKeys,
+		successMessage: t("bulkApplied"),
+		errorMessage: t("bulkError"),
+		onSuccess: () => {
+			setIsBulkOpen(false);
+			setBulkPreview(null);
+			setBulkPercent("");
+		},
+	});
+
 	const form = useForm({
 		defaultValues: {
 			name: "",
@@ -171,6 +217,8 @@ export default function Products() {
 			price: 0,
 			in_stock: 0,
 			min_stock: 0,
+			wholesale_price: 0,
+			wholesale_min_qty: 0,
 			barcode: "",
 			category: "",
 			unit_of_measure: "UN",
@@ -185,6 +233,14 @@ export default function Products() {
 				price: Math.round(value.price * 100),
 				in_stock: value.in_stock,
 				min_stock: value.min_stock,
+				wholesale_price:
+					value.wholesale_price > 0
+						? Math.round(value.wholesale_price * 100)
+						: null,
+				wholesale_min_qty:
+					value.wholesale_price > 0 && value.wholesale_min_qty > 0
+						? value.wholesale_min_qty
+						: null,
 				barcode: value.barcode || undefined,
 				category: value.category || undefined,
 				unit_of_measure: value.unit_of_measure || undefined,
@@ -222,6 +278,8 @@ export default function Products() {
 		form.setFieldValue("price", p.price / 100);
 		form.setFieldValue("in_stock", p.in_stock);
 		form.setFieldValue("min_stock", p.min_stock);
+		form.setFieldValue("wholesale_price", (p.wholesale_price ?? 0) / 100);
+		form.setFieldValue("wholesale_min_qty", p.wholesale_min_qty ?? 0);
 		form.setFieldValue("barcode", p.barcode ?? "");
 		form.setFieldValue("category", p.category ?? "");
 		form.setFieldValue("unit_of_measure", p.unit_of_measure ?? "");
@@ -234,6 +292,51 @@ export default function Products() {
 			setIsDeleteOpen(false);
 			setDeleteId(null);
 		}
+	};
+
+	const categoryOptions = useMemo(
+		() =>
+			[
+				...new Set(products.map((p) => p.category).filter(Boolean)),
+			].sort() as string[],
+		[products],
+	);
+
+	const openBulk = () => {
+		setBulkPreview(null);
+		setBulkPercent("");
+		setBulkScope("all");
+		setBulkCategory("");
+		setBulkRoundTo("0");
+		setIsBulkOpen(true);
+	};
+
+	const bulkInput = () => ({
+		scope: bulkScope,
+		category: bulkScope === "category" ? bulkCategory : undefined,
+		percent: Number(bulkPercent),
+		roundTo: Number(bulkRoundTo) || 0,
+	});
+
+	const bulkPercentIsValid = () => {
+		const percent = Number(bulkPercent);
+		return bulkPercent.trim() !== "" && !Number.isNaN(percent) && percent !== 0;
+	};
+
+	const handlePreview = () => {
+		if (!bulkPercentIsValid()) {
+			toast.error(t("bulkPercentRequired"));
+			return;
+		}
+		previewMutation.mutate({ ...bulkInput(), dryRun: true });
+	};
+
+	const handleApply = () => {
+		if (!bulkPercentIsValid()) {
+			toast.error(t("bulkPercentRequired"));
+			return;
+		}
+		applyMutation.mutate(bulkInput());
 	};
 
 	const actionsColumn: Column<Product> = {
@@ -304,6 +407,10 @@ export default function Products() {
 							},
 						]}
 					>
+						<Button size="sm" variant="outline" onClick={openBulk}>
+							<TagsIcon className="mr-2 h-4 w-4" />
+							{t("bulkAdjust")}
+						</Button>
 						<Button size="sm" onClick={openCreate}>
 							<PlusIcon className="mr-2 h-4 w-4" />
 							{t("addProduct")}
@@ -468,6 +575,69 @@ export default function Products() {
 									</div>
 								)}
 							</form.Field>
+							<form.Field name="wholesale_price">
+								{(field) => (
+									<div className="flex flex-col gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+										<Label htmlFor="wholesale_price" className="sm:text-right">
+											{t("wholesalePrice")}
+										</Label>
+										<div className="col-span-3">
+											<Input
+												id="wholesale_price"
+												type="number"
+												step="0.01"
+												min="0"
+												value={field.state.value}
+												onChange={(e) =>
+													field.handleChange(Number(e.target.value))
+												}
+												onBlur={field.handleBlur}
+												error={
+													field.state.meta.errors.length > 0
+														? field.state.meta.errors
+																.map((e) => e?.message ?? e)
+																.join(", ")
+														: undefined
+												}
+											/>
+										</div>
+									</div>
+								)}
+							</form.Field>
+							<form.Field name="wholesale_min_qty">
+								{(field) => (
+									<div className="flex flex-col gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+										<Label
+											htmlFor="wholesale_min_qty"
+											className="sm:text-right"
+										>
+											{t("wholesaleMinQty")}
+										</Label>
+										<div className="col-span-3">
+											<Input
+												id="wholesale_min_qty"
+												type="number"
+												min="0"
+												value={field.state.value}
+												onChange={(e) =>
+													field.handleChange(Number(e.target.value))
+												}
+												onBlur={field.handleBlur}
+												error={
+													field.state.meta.errors.length > 0
+														? field.state.meta.errors
+																.map((e) => e?.message ?? e)
+																.join(", ")
+														: undefined
+												}
+											/>
+											<p className="mt-1 text-muted-foreground text-xs">
+												{t("wholesaleHint")}
+											</p>
+										</div>
+									</div>
+								)}
+							</form.Field>
 							<form.Field name="barcode">
 								{(field) => (
 									<div className="flex flex-col gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
@@ -571,6 +741,158 @@ export default function Products() {
 				onConfirm={handleDelete}
 				description={t("deleteMessage")}
 			/>
+
+			<Dialog
+				open={isBulkOpen}
+				onOpenChange={(open) => {
+					if (!open) setIsBulkOpen(false);
+				}}
+			>
+				<DialogContent className="max-w-2xl">
+					<DialogHeader>
+						<DialogTitle>{t("bulkTitle")}</DialogTitle>
+						<DialogDescription>{t("bulkDescription")}</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4 py-4">
+						<div className="grid gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+							<Label className="sm:text-right">{t("bulkScope")}</Label>
+							<Select
+								value={bulkScope}
+								onValueChange={(value) => {
+									setBulkScope(value as "all" | "category");
+									setBulkPreview(null);
+								}}
+							>
+								<SelectTrigger className="col-span-3">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">{t("bulkScopeAll")}</SelectItem>
+									<SelectItem value="category">
+										{t("bulkScopeCategory")}
+									</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						{bulkScope === "category" && (
+							<div className="grid gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+								<Label className="sm:text-right">{tc("category")}</Label>
+								<Select
+									value={bulkCategory}
+									onValueChange={(value) => {
+										setBulkCategory(value);
+										setBulkPreview(null);
+									}}
+								>
+									<SelectTrigger className="col-span-3">
+										<SelectValue placeholder={t("selectCategory")} />
+									</SelectTrigger>
+									<SelectContent>
+										{categoryOptions.map((category) => (
+											<SelectItem key={category} value={category}>
+												{category}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+						)}
+
+						<div className="grid gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+							<Label htmlFor="bulk_percent" className="sm:text-right">
+								{t("bulkPercent")}
+							</Label>
+							<div className="col-span-3">
+								<Input
+									id="bulk_percent"
+									type="number"
+									step="0.1"
+									placeholder="10"
+									value={bulkPercent}
+									onChange={(e) => {
+										setBulkPercent(e.target.value);
+										setBulkPreview(null);
+									}}
+								/>
+							</div>
+						</div>
+
+						<div className="grid gap-2 sm:grid sm:grid-cols-4 sm:items-center sm:gap-4">
+							<Label className="sm:text-right">{t("bulkRoundTo")}</Label>
+							<Select
+								value={bulkRoundTo}
+								onValueChange={(value) => {
+									setBulkRoundTo(value);
+									setBulkPreview(null);
+								}}
+							>
+								<SelectTrigger className="col-span-3">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="0">{t("bulkRoundNone")}</SelectItem>
+									<SelectItem value="100">$1</SelectItem>
+									<SelectItem value="500">$5</SelectItem>
+									<SelectItem value="1000">$10</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						{bulkPreview !== null && (
+							<div className="rounded-md border p-3 text-sm">
+								<p className="mb-2 font-medium">
+									{bulkPreview.length === 0
+										? t("bulkNoChanges")
+										: t("bulkChanges", { count: bulkPreview.length })}
+								</p>
+								{bulkPreview.length > 0 && (
+									<div className="max-h-56 space-y-1 overflow-y-auto">
+										{bulkPreview.map((change) => (
+											<div
+												key={change.product_id}
+												className="flex items-center justify-between gap-4"
+											>
+												<span className="truncate">{change.name}</span>
+												<span className="shrink-0 text-muted-foreground tabular-nums">
+													{formatCurrency(change.before, locale)} →{" "}
+													{formatCurrency(change.after, locale)}
+												</span>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="secondary"
+							onClick={() => setIsBulkOpen(false)}
+							disabled={applyMutation.isPending}
+						>
+							{tc("cancel")}
+						</Button>
+						<Button
+							variant="outline"
+							onClick={handlePreview}
+							disabled={previewMutation.isPending || applyMutation.isPending}
+						>
+							{t("bulkPreview")}
+						</Button>
+						<Button
+							onClick={handleApply}
+							disabled={
+								applyMutation.isPending ||
+								bulkPreview === null ||
+								bulkPreview.length === 0
+							}
+						>
+							{t("bulkApply")}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</>
 	);
 }
