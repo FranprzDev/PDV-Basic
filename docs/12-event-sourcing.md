@@ -1,83 +1,83 @@
 # Event Sourcing & CQRS
 
-## Decisão (ADR)
+## Decisión (ADR)
 
-**Status:** aceito — branch `feat/cqrs-event-sourcing`
+**Estado:** aceptado — rama `feat/cqrs-event-sourcing`
 
-Os domínios operacionais (produtos, clientes, pedidos, transações e métodos
-de pagamento) passam a ser **event-sourced de verdade**: a única fonte de
-verdade é o log append-only `events`, e **todo estado é reconstruído por
-replay dos eventos em cada leitura — não existem snapshots nem tabelas de
+Los dominios operacionales (productos, clientes, pedidos, transacciones y métodos
+de pago) pasan a ser **event-sourced de verdad**: la única fuente de
+verdad es el log append-only `events`, y **todo estado se reconstruye por
+replay de los eventos en cada lectura — no existen snapshots ni tablas de
 estado materializado**.
 
 ### Contexto
 
-O app roda inteiramente sobre **PGlite** (Postgres embarcado, single-writer,
-sem TCP). Isso descarta stores externos (EventStoreDB/Kurrent, NATS
-JetStream) e também o store PostgreSQL do
-[Emmett](https://event-driven-io.github.io/emmett/overview.html) — a
-biblioteca de referência de event sourcing em TypeScript — porque ele depende
-de `node-postgres` com pool de conexões
-([detalhes](https://event-driven.io/en/emmett_postgresql_event_store/)).
+La app corre enteramente sobre **PGlite** (Postgres embebido, single-writer,
+sin TCP). Eso descarta stores externos (EventStoreDB/Kurrent, NATS
+JetStream) y también el store PostgreSQL de
+[Emmett](https://event-driven-io.github.io/emmett/overview.html) — la
+biblioteca de referencia de event sourcing en TypeScript — porque depende
+de `node-postgres` con pool de conexiones
+([detalles](https://event-driven.io/en/emmett_postgresql_event_store/)).
 
-A solução é um event store próprio (`@finopenpos/event-sourcing`) que adota
-os mesmos padrões do Emmett e da literatura de event stores em Postgres
-([schema com UNIQUE (stream, version)](https://dev.to/tim_derzhavets/building-a-production-ready-event-store-in-postgresql-schema-design-projections-and-replay-25o8),
-[event storage in Postgres](https://dev.to/kspeakman/event-storage-in-postgres-4dk2),
+La solución es un event store propio (`@finopenpos/event-sourcing`) que adopta
+los mismos patrones de Emmett y de la literatura de event stores en Postgres
+([schema con UNIQUE (stream, version)](https://dev.to/tim_derzhavets/building-a-production-ready-event-store-in-postgresql-schema-design-projections-and-replay-25o8),
+[event storage en Postgres](https://dev.to/kspeakman/event-storage-in-postgres-4dk2),
 [postgresql-event-sourcing](https://github.com/eugene-khyst/postgresql-event-sourcing)):
 
-- **Decider pattern**: comandos validam contra o estado reconstruído e
-  emitem eventos; reducers puros fazem `estado + evento → estado`.
-- **Concorrência otimista** via `UNIQUE (stream_type, stream_id, version)` —
-  um append com versão defasada é rejeitado pelo banco
-  (`ConcurrencyError`), sem lock de aplicação.
-- **Ordem total** via `global_seq serial` — base de qualquer replay e de
+- **Patrón Decider**: los comandos validan contra el estado reconstruido y
+  emiten eventos; reducers puros hacen `estado + evento → estado`.
+- **Concurrencia optimista** vía `UNIQUE (stream_type, stream_id, version)` —
+  un append con versión defasada es rechazado por la base
+  (`ConcurrencyError`), sin lock de aplicación.
+- **Orden total** vía `global_seq serial` — base de cualquier replay y de
   time-travel (`toGlobalSeq`).
 
-### Benchmark (decide o design físico)
+### Benchmark (decide el diseño físico)
 
 `packages/event-sourcing/bench/store-bench.ts` (PGlite in-memory, Bun;
-resultados em `bench/results.json`, Apple Silicon):
+resultados en `bench/results.json`, Apple Silicon):
 
 | Variante | Append (2k eventos) | Replay + fold |
 |---|---|---|
-| payload `jsonb`, insert unitário | 10.564 ops/s | — |
+| payload `jsonb`, insert unitario | 10.564 ops/s | — |
 | payload `jsonb`, batch 100 | 91.011 ops/s | 539k eventos/s (50k) |
-| payload `text`, insert unitário | 13.091 ops/s | — |
+| payload `text`, insert unitario | 13.091 ops/s | — |
 | payload `text`, batch 100 | **105.032 ops/s** | **935k eventos/s (50k)** |
 
-Decisões extraídas:
+Decisiones extraídas:
 
-1. **Payload como `text` (JSON serializado)**, não `jsonb`: o fold acontece
-   sempre em JS — nunca filtramos dentro do payload via SQL — então o
-   `jsonb` só adiciona custo de parse no PGlite. `text` rende ~1,7x no
-   replay e ~15–25% no append.
-2. **Append multi-row**: todos os eventos de um comando entram em um único
-   `INSERT ... VALUES (...), (...)` (~8x mais rápido que inserts unitários).
-3. **Reconstrução total a cada leitura é viável**: replay de 50 mil eventos
-   custa ~54 ms; um POS típico (dezenas de milhares de eventos por usuário)
-   fica na casa de poucos ms por consulta. Sem rede (PGlite embarcado), não
-   há round-trips a amortizar.
+1. **Payload como `text` (JSON serializado)**, no `jsonb`: el fold ocurre
+   siempre en JS — nunca filtramos dentro del payload vía SQL — entonces el
+   `jsonb` solo agrega costo de parse en PGlite. `text` rinde ~1,7x en el
+   replay y ~15–25% en el append.
+2. **Append multi-row**: todos los eventos de un comando entran en un único
+   `INSERT ... VALUES (...), (...)` (~8x más rápido que inserts unitarios).
+3. **La reconstrucción total en cada lectura es viable**: replay de 50 mil eventos
+   cuesta ~54 ms; un POS típico (decenas de miles de eventos por usuario)
+   queda en el orden de pocos ms por consulta. Sin red (PGlite embebido), no
+   hay round-trips que amortizar.
 
-### Fora do escopo do event sourcing
+### Fuera del alcance del event sourcing
 
-Nada além dos cinco domínios operacionais é event-sourced hoje. O schema
-tem apenas a tabela `events` e as tabelas de auth do Better Auth.
+Nada más allá de los cinco dominios operacionales es event-sourced hoy. El schema
+tiene solo la tabla `events` y las tablas de auth de Better Auth.
 
-## Arquitetura
+## Arquitectura
 
 ```
 apps/web/src/lib/trpc/routers/*    ← contrato tRPC/OpenAPI inalterado
         │ comandos                       │ queries
         ▼                                ▼
 apps/web/src/lib/es/*              (write side)   (read side)
-  products / customers / orders /   comandos +     projeções: readAll +
+  products / customers / orders /   comandos +     proyecciones: readAll +
   transactions / payment-methods    reducers       foldStreams por request
         ▼
 packages/event-sourcing            EventStore (append, appendMany, readStream,
                                    readAll, nextStreamId), foldStream(s), tipos
         ▼
-tabela `events` (PGlite)           global_seq | stream_type | stream_id |
+tabla `events` (PGlite)            global_seq | stream_type | stream_id |
                                    version | event_type | payload(text) |
                                    user_uid | occurred_at
 ```
@@ -88,47 +88,47 @@ tabela `events` (PGlite)           global_seq | stream_type | stream_id |
 |---|---|
 | `product` | `ProductCreated`, `ProductUpdated`, `StockDecremented`, `ProductDeleted` |
 | `customer` | `CustomerCreated`, `CustomerUpdated`, `CustomerDeleted` |
-| `order` | `OrderPlaced` (com itens embutidos), `OrderUpdated`, `OrderDeleted` |
+| `order` | `OrderPlaced` (con ítems embebidos), `OrderUpdated`, `OrderDeleted` |
 | `transaction` | `TransactionRecorded`, `TransactionUpdated`, `TransactionDeleted` |
 | `payment_method` | `PaymentMethodCreated`, `PaymentMethodRenamed`, `PaymentMethodDeleted` |
 
-Observações:
+Observaciones:
 
-- Os **itens do pedido** são parte do fato `OrderPlaced` (um pedido é
-  colocado com seus itens — não existem eventos por item). O `id` de item
-  exposto na API é sintético e estável (`order_id * 1000 + índice + 1`).
-- A venda no POS é **um só comando atômico** que grava em três agregados:
-  `OrderPlaced` (pedido), `StockDecremented` por ítem (estoque) e
-  `TransactionRecorded` (pago) — tudo num único `appendMany` (um INSERT). Se
-  qualquer stream tiver mudado no meio-tempo, o comando inteiro é rejeitado.
-- O **preço e o total saem do catálogo do servidor**; o cliente só manda o que
-  e quanto. O estoque é validado e baixado como parte do mesmo fato — o POS não
-  é a autoridade sobre preço nem sobre disponibilidade.
-- Deletar o pedido **não apaga** a transação nem devolve o estoque — fatos
-  históricos permanecem no log. A anulação com reingresso é um evento novo
-  (pendente), não uma edição do passado.
-- `deleted` é um evento como outro qualquer: o reducer devolve `undefined`
-  e a projeção remove a entidade do read model. O histórico continua
-  disponível para auditoria/replay.
-- IDs numéricos são preservados (compatibilidade com o contrato da API):
-  `nextStreamId` aloca `MAX(stream_id)+1` por tipo de stream; uma corrida
-  (impossível no PGlite single-writer) seria rejeitada pelo UNIQUE.
-- O **seed** é uma importação de eventos históricos (`occurredAt` no
-  passado), exatamente como os dados teriam entrado pelo uso normal.
+- Los **ítems del pedido** son parte del hecho `OrderPlaced` (un pedido se
+  coloca con sus ítems — no existen eventos por ítem). El `id` de ítem
+  expuesto en la API es sintético y estable (`order_id * 1000 + índice + 1`).
+- La venta en el POS es **un solo comando atómico** que graba en tres agregados:
+  `OrderPlaced` (pedido), `StockDecremented` por ítem (stock) y
+  `TransactionRecorded` (pago) — todo en un único `appendMany` (un INSERT). Si
+  cualquier stream cambió en el medio tiempo, el comando entero es rechazado.
+- El **precio y el total salen del catálogo del servidor**; el cliente solo manda qué
+  y cuánto. El stock se valida y se descuenta como parte del mismo hecho — el POS no
+  es la autoridad sobre el precio ni sobre la disponibilidad.
+- Borrar el pedido **no borra** la transacción ni devuelve el stock — los hechos
+  históricos permanecen en el log. La anulación con reingreso es un evento nuevo
+  (pendiente), no una edición del pasado.
+- `deleted` es un evento como cualquier otro: el reducer devuelve `undefined`
+  y la proyección elimina la entidad del read model. El historial sigue
+  disponible para auditoría/replay.
+- Los IDs numéricos se preservan (compatibilidad con el contrato de la API):
+  `nextStreamId` asigna `MAX(stream_id)+1` por tipo de stream; una carrera
+  (imposible en PGlite single-writer) sería rechazada por el UNIQUE.
+- El **seed** es una importación de eventos históricos (`occurredAt` en el
+  pasado), exactamente como los datos habrían entrado por el uso normal.
 
-### Invariantes mantidas no write side
+### Invariantes mantenidas en el write side
 
-- E-mail de cliente único (global) — validado contra a projeção antes do
+- Email de cliente único (global) — validado contra la proyección antes del
   append.
-- Nome de método de pagamento único — idem.
-- Escopo por usuário: comandos verificam `user_uid` do stream antes de
-  gravar; queries filtram eventos por `user_uid` no SQL.
-- Preço e total de uma venda: calculados no servidor a partir do catálogo,
-  nunca aceitos do cliente.
-- Estoque: a venda só passa se houver `in_stock` suficiente de cada produto;
-  a baixa entra no mesmo append atômico do pedido e do pagamento.
+- Nombre de método de pago único — ídem.
+- Alcance por usuario: los comandos verifican `user_uid` del stream antes de
+  grabar; las queries filtran eventos por `user_uid` en el SQL.
+- Precio y total de una venta: calculados en el servidor a partir del catálogo,
+  nunca aceptados del cliente.
+- Stock: la venta solo pasa si hay `in_stock` suficiente de cada producto;
+  la baja entra en el mismo append atómico del pedido y del pago.
 
-## Referências
+## Referencias
 
 - [Emmett — overview](https://event-driven-io.github.io/emmett/overview.html)
 - [Event Sourcing on PostgreSQL in Node.js with Emmett](https://event-driven.io/en/emmett_postgresql_event_store/)

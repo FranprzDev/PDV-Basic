@@ -71,7 +71,7 @@ export function transactionReducer(
 	}
 }
 
-// ── Projeções ───────────────────────────────────────────────────────────────
+// ── Proyecciones ────────────────────────────────────────────────────────────
 export async function listTransactions(
 	userUid: string,
 ): Promise<Transaction[]> {

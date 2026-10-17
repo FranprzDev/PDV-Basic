@@ -79,7 +79,7 @@ export function orderReducer(
 	}
 }
 
-// ── Projeções ───────────────────────────────────────────────────────────────
+// ── Proyecciones ────────────────────────────────────────────────────────────
 export async function orderMap(userUid: string): Promise<Map<number, Order>> {
 	const events = await eventStore.readAll<OrderEvent>([STREAM.order], {
 		userUid,
@@ -140,7 +140,7 @@ export async function getOrderDetail(
 		orderItems: state.items.map((item, idx) => {
 			const product = products.get(item.product_id);
 			return {
-				// itens vivem dentro do evento OrderPlaced; id sintético estável
+				// los ítems viven dentro del evento OrderPlaced; id sintético estable
 				id: state.id * 1000 + idx + 1,
 				product_id: item.product_id,
 				quantity: item.quantity,
@@ -190,12 +190,12 @@ export class OrderError extends Error {
 }
 
 /**
- * Fluxo de venda do POS: um pedido é um só fato que toca três agregados —
- * `OrderPlaced` (pedido), `StockDecremented` por ítem (estoque) e
- * `TransactionRecorded` (pago) — gravados num único append atómico.
+ * Flujo de venta del POS: un pedido es un solo hecho que toca tres agregados —
+ * `OrderPlaced` (pedido), `StockDecremented` por ítem (stock) y
+ * `TransactionRecorded` (pago) — grabados en un único append atómico.
  *
- * O preço e o total saem do catálogo do servidor: o cliente só manda o que e
- * quanto. O estoque é validado e baixado aqui, não no navegador.
+ * El precio y el total salen del catálogo del servidor: el cliente solo manda qué y
+ * cuánto. El stock se valida y se descuenta acá, no en el navegador.
  */
 export async function placeOrder(
 	userUid: string,
@@ -261,7 +261,7 @@ export async function placeOrder(
 	const orderId = await eventStore.nextStreamId(STREAM.order);
 	const transactionId = await eventStore.nextStreamId(STREAM.transaction);
 
-	// Un solo INSERT: pedido + baixa de estoque + pago. Tudo grava ou nada grava.
+	// Un solo INSERT: pedido + baja de stock + pago. Todo se graba o nada se graba.
 	const stored = await eventStore.appendMany<
 		OrderEvent | TransactionEvent | ProductEvent
 	>(

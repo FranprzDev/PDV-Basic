@@ -62,7 +62,7 @@ export function customerReducer(
 	}
 }
 
-// ── Projeções ───────────────────────────────────────────────────────────────
+// ── Proyecciones ────────────────────────────────────────────────────────────
 export async function listCustomers(userUid: string): Promise<Customer[]> {
 	const events = await eventStore.readAll<CustomerEvent>([STREAM.customer], {
 		userUid,
@@ -89,7 +89,7 @@ export async function loadCustomer(
 	return foldStream(events, customerReducer);
 }
 
-/** Emails são únicos globalmente (invariante herdada do UNIQUE da tabela legada). */
+/** Los emails son únicos globalmente (invariante heredada del UNIQUE de la tabla legada). */
 async function assertEmailAvailable(
 	email: string,
 	exceptId?: number,

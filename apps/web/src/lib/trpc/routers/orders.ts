@@ -102,7 +102,7 @@ export const ordersRouter = router({
 			z.object({
 				id: z.number(),
 				total_amount: z.number().int().optional(),
-				status: z.enum(["completed", "pending", "cancelled"]).optional(),
+				status: z.enum(["completed", "pending"]).optional(),
 			}),
 		)
 		.output(orderWithCustomerSchema)

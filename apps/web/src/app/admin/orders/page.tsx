@@ -49,7 +49,7 @@ import type { RouterOutputs } from "@/lib/trpc/router";
 import { formatCurrency } from "@/lib/utils";
 
 type Order = RouterOutputs["orders"]["list"][number];
-type OrderStatus = "completed" | "pending" | "cancelled";
+type OrderStatus = "completed" | "pending";
 
 export default function OrdersPage() {
 	const trpc = useTRPC();
@@ -64,14 +64,13 @@ export default function OrdersPage() {
 
 	const orderEditSchema = z.object({
 		total: z.string().min(1, t("totalRequired")),
-		status: z.enum(["completed", "pending", "cancelled"]),
+		status: z.enum(["completed", "pending"]),
 	});
 
 	const statusFilterOptions: FilterOption[] = [
 		{ label: tc("all"), value: "all" },
 		{ label: tc("completed"), value: "completed", variant: "success" },
 		{ label: tc("pending"), value: "pending", variant: "warning" },
-		{ label: tc("cancelled"), value: "cancelled", variant: "danger" },
 	];
 
 	const tableColumns: Column<Order>[] = [
@@ -96,18 +95,8 @@ export default function OrdersPage() {
 			sortable: true,
 			render: (row) => {
 				const s = row.status ?? "pending";
-				const color =
-					s === "completed"
-						? "text-green-600"
-						: s === "cancelled"
-							? "text-red-600"
-							: "text-yellow-600";
-				const label =
-					s === "completed"
-						? tc("completed")
-						: s === "cancelled"
-							? tc("cancelled")
-							: tc("pending");
+				const color = s === "completed" ? "text-green-600" : "text-yellow-600";
+				const label = s === "completed" ? tc("completed") : tc("pending");
 				return <span className={color}>{label}</span>;
 			},
 		},
@@ -381,9 +370,6 @@ export default function OrdersPage() {
 													{tc("completed")}
 												</SelectItem>
 												<SelectItem value="pending">{tc("pending")}</SelectItem>
-												<SelectItem value="cancelled">
-													{tc("cancelled")}
-												</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>

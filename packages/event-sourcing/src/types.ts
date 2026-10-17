@@ -1,24 +1,24 @@
 /**
- * Tipos centrais do event sourcing.
+ * Tipos centrales del event sourcing.
  *
- * Um evento de domínio é um fato imutável: `{ type, data }`.
- * Depois de persistido ele vira um `StoredEvent`, ganhando posição global
- * (`globalSeq`), versão dentro do stream e timestamp.
+ * Un evento de dominio es un hecho inmutable: `{ type, data }`.
+ * Una vez persistido se convierte en un `StoredEvent`, ganando posición global
+ * (`globalSeq`), versión dentro del stream y timestamp.
  */
 
-/** Evento de domínio ainda não persistido. */
+/** Evento de dominio todavía no persistido. */
 export interface DomainEvent<TType extends string = string, TData = unknown> {
 	type: TType;
 	data: TData;
 }
 
-/** Evento persistido no event store (fato imutável). */
+/** Evento persistido en el event store (hecho inmutable). */
 export interface StoredEvent<TEvent extends DomainEvent = DomainEvent> {
-	/** Posição global no log (ordem total de todos os eventos). */
+	/** Posición global en el log (orden total de todos los eventos). */
 	globalSeq: number;
 	streamType: string;
 	streamId: number;
-	/** Versão do evento dentro do stream (1, 2, 3, ...). */
+	/** Versión del evento dentro del stream (1, 2, 3, ...). */
 	version: number;
 	type: TEvent["type"];
 	data: TEvent extends DomainEvent<string, infer D> ? D : unknown;
@@ -26,7 +26,7 @@ export interface StoredEvent<TEvent extends DomainEvent = DomainEvent> {
 	occurredAt: Date;
 }
 
-/** Reducer puro: estado anterior + evento → novo estado. */
+/** Reducer puro: estado anterior + evento → nuevo estado. */
 export type Reducer<TState, TEvent extends DomainEvent = DomainEvent> = (
 	state: TState | undefined,
 	event: StoredEvent<TEvent>,
@@ -36,34 +36,34 @@ export interface AppendInput<TEvent extends DomainEvent = DomainEvent> {
 	streamType: string;
 	streamId: number;
 	/**
-	 * Versão esperada do stream antes do append (0 = stream novo).
-	 * Se outro comando tiver gravado nesse meio-tempo, o UNIQUE
-	 * (stream_type, stream_id, version) rejeita e lançamos ConcurrencyError.
+	 * Versión esperada del stream antes del append (0 = stream nuevo).
+	 * Si otro comando hubiera grabado en ese medio tiempo, el UNIQUE
+	 * (stream_type, stream_id, version) rechaza y lanzamos ConcurrencyError.
 	 */
 	expectedVersion: number;
 	events: TEvent[];
 	userUid: string;
-	/** Timestamp do fato (default: now). Útil para seeds/importação. */
+	/** Timestamp del hecho (default: now). Útil para seeds/importación. */
 	occurredAt?: Date;
 }
 
 /**
- * Um stream em um append multi-stream: comando que grava em mais de um
- * agregado como um só fato (ex.: venda = pedido + baixa de estoque + pago).
- * Todos os streams entram no mesmo INSERT, portanto tudo grava ou nada grava.
+ * Un stream en un append multi-stream: comando que graba en más de un
+ * agregado como un solo hecho (ej.: venta = pedido + baja de stock + pago).
+ * Todos los streams entran en el mismo INSERT, por lo tanto todo se graba o nada se graba.
  */
 export interface StreamAppend<TEvent extends DomainEvent = DomainEvent> {
 	streamType: string;
 	streamId: number;
-	/** Versão esperada do stream antes do append (0 = stream novo). */
+	/** Versión esperada del stream antes del append (0 = stream nuevo). */
 	expectedVersion: number;
 	events: TEvent[];
 }
 
 export interface ReadOptions {
-	/** Filtra por dono dos eventos. */
+	/** Filtra por dueño de los eventos. */
 	userUid?: string;
-	/** Lê somente até esta posição global (time-travel). */
+	/** Lee solo hasta esta posición global (time-travel). */
 	toGlobalSeq?: number;
 }
 

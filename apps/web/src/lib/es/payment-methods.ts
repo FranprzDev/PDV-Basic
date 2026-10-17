@@ -37,7 +37,7 @@ export function paymentMethodReducer(
 	}
 }
 
-// ── Projeções (métodos de pagamento são globais, sem escopo de usuário) ─────
+// ── Proyecciones (los métodos de pago son globales, sin alcance de usuario) ─
 export async function listPaymentMethods(): Promise<PaymentMethod[]> {
 	const events = await eventStore.readAll<PaymentMethodEvent>([
 		STREAM.paymentMethod,

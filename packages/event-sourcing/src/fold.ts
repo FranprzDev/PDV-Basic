@@ -1,9 +1,9 @@
 import type { DomainEvent, Reducer, StoredEvent } from "./types";
 
 /**
- * Reconstrói o estado de todos os streams presentes numa lista de eventos.
- * Retorna um Map streamId → estado (streams cujo reducer devolveu
- * `undefined` — ex.: deletados — são removidos do mapa).
+ * Reconstruye el estado de todos los streams presentes en una lista de eventos.
+ * Devuelve un Map streamId → estado (los streams cuyo reducer devolvió
+ * `undefined` — ej.: eliminados — se quitan del mapa).
  */
 export function foldStreams<TState, TEvent extends DomainEvent>(
 	events: StoredEvent<TEvent>[],
@@ -18,7 +18,7 @@ export function foldStreams<TState, TEvent extends DomainEvent>(
 	return state;
 }
 
-/** Reconstrói o estado de um único stream a partir dos seus eventos. */
+/** Reconstruye el estado de un único stream a partir de sus eventos. */
 export function foldStream<TState, TEvent extends DomainEvent>(
 	events: StoredEvent<TEvent>[],
 	reducer: Reducer<TState, TEvent>,

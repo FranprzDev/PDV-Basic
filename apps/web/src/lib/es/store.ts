@@ -2,9 +2,9 @@ import { EventStore } from "@finopenpos/event-sourcing";
 import * as dbModule from "@/lib/db";
 
 /**
- * Event store da aplicação, ligado à mesma instância PGlite do restante
- * do app. A resolução de `pglite` acontece a cada chamada para respeitar
- * mocks de módulo nos testes (cada arquivo de teste injeta sua instância).
+ * Event store de la aplicación, ligado a la misma instancia PGlite del resto
+ * del app. La resolución de `pglite` ocurre en cada llamada para respetar
+ * los mocks de módulo en los tests (cada archivo de test inyecta su instancia).
  */
 export const eventStore = new EventStore({
 	query: (sql, params) => dbModule.pglite.query(sql, params),

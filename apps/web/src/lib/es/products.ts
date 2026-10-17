@@ -17,7 +17,7 @@ export interface ProductCreatedData {
 
 export type ProductUpdatedData = Partial<ProductCreatedData>;
 
-/** Baixa de estoque: unidades que saem por uma venda. */
+/** Baja de stock: unidades que salen por una venta. */
 export interface StockDecrementedData {
 	quantity: number;
 }
@@ -28,7 +28,7 @@ export type ProductEvent =
 	| DomainEvent<"StockDecremented", StockDecrementedData>
 	| DomainEvent<"ProductDeleted", Record<string, never>>;
 
-// ── Estado (mesma forma do contrato da API) ─────────────────────────────────
+// ── Estado (misma forma del contrato de la API) ─────────────────────────────
 export interface Product {
 	id: number;
 	name: string;
@@ -94,7 +94,7 @@ export function productReducer(
 	}
 }
 
-// ── Projeções (estado sempre reconstruído dos eventos) ──────────────────────
+// ── Proyecciones (estado siempre reconstruido de los eventos) ───────────────
 export async function listProducts(userUid: string): Promise<Product[]> {
 	const events = await eventStore.readAll<ProductEvent>([STREAM.product], {
 		userUid,
