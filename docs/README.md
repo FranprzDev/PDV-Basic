@@ -3,4 +3,5 @@
 - Arranque rápido: ver `README.md` y `CONTRIBUTING.md`.
 - Impresión: `apps/print-agent/README.md` (drivers WebUSB / agente local / sistema).
 - Event sourcing: `docs/12-event-sourcing.md`.
-- Deploy: `docker compose up -d` → http://localhost:3111, volumen PGLite en `apps/web/data/pglite`.
+- Deploy: `docker compose up -d` → http://localhost:3111, volumen PGLite en `apps/web/data/pglite` (guía y checklist en `docs/deploy.md`).
+- Roadmap: `docs/roadmap.md`.
