@@ -26,9 +26,9 @@ const EXPENSE_CATEGORIES = [
 ] as const;
 
 /**
- * Seed = importação de eventos históricos: os dados de demonstração entram
- * no sistema como fatos no event log (com occurredAt no passado), exatamente
- * como teriam entrado pelo uso normal.
+ * Seed = importación de eventos históricos: los datos de demostración entran
+ * al sistema como hechos en el event log (con `occurredAt` en el pasado),
+ * exactamente como habrían entrado por el uso normal.
  */
 export async function seed() {
 	const existing = await db
@@ -146,7 +146,6 @@ export async function seed() {
 		const status = faker.helpers.weightedArrayElement([
 			{ value: "completed", weight: 8 },
 			{ value: "pending", weight: 1.5 },
-			{ value: "cancelled", weight: 0.5 },
 		]);
 
 		const orderId = await eventStore.nextStreamId(STREAM.order);

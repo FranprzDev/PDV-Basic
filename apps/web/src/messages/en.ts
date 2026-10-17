@@ -29,7 +29,6 @@ const messages = {
 		inactive: "Inactive",
 		completed: "Completed",
 		pending: "Pending",
-		cancelled: "Cancelled",
 		income: "Income",
 		expense: "Expense",
 		all: "All",
@@ -243,6 +242,7 @@ const messages = {
 		limitedStock: "Only {count} units of {name} available",
 		limitedUnits: "Only {count} units available",
 		belowMinimum: "{name} reached minimum stock",
+		inStock: "{count} in stock",
 		hotkeys: {
 			title: "Keyboard shortcuts",
 			reset: "Reset",

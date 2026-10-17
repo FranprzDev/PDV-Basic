@@ -82,17 +82,9 @@ export default function OrderDetailPage({
 	}
 
 	const statusColor =
-		order.status === "completed"
-			? "text-green-600"
-			: order.status === "cancelled"
-				? "text-red-600"
-				: "text-yellow-600";
+		order.status === "completed" ? "text-green-600" : "text-yellow-600";
 	const statusLabel =
-		order.status === "completed"
-			? tc("completed")
-			: order.status === "cancelled"
-				? tc("cancelled")
-				: tc("pending");
+		order.status === "completed" ? tc("completed") : tc("pending");
 
 	return (
 		<div className="max-w-3xl space-y-6">

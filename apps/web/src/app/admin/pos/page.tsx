@@ -25,7 +25,6 @@ import {
 	MinusIcon,
 	PlusIcon,
 	PrinterIcon,
-	ReceiptTextIcon,
 	ScanBarcodeIcon,
 	SearchIcon,
 	Trash2Icon,
@@ -33,6 +32,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { BUSINESS_NAME } from "@/lib/config";
 import { isBelowMinimum } from "@/lib/es/products";
 import { useHotkeys } from "@/lib/hotkeys/use-hotkeys";
 import { useTicketPrinter } from "@/lib/printer/use-ticket-printer";
@@ -81,7 +81,6 @@ export default function POSPage() {
 		name: string;
 	} | null>(null);
 	const [productSearch, setProductSearch] = useState("");
-	const [emitNfce, setEmitNfce] = useState(false);
 	const [lastScan, setLastScan] = useState<{
 		code: string;
 		name?: string;
@@ -155,7 +154,7 @@ export default function POSPage() {
 				toast.success(tOrders("createdSuccessfully"));
 
 				void printTicket({
-					businessName: "Mi Negocio",
+					businessName: BUSINESS_NAME,
 					receiptNumber: String(order?.id ?? Date.now()),
 					items: selectedProducts.map((p) => ({
 						name: p.name,
@@ -418,7 +417,7 @@ export default function POSPage() {
 						<Combobox
 							items={filteredProducts.map((p) => ({
 								id: p.id,
-								name: `${p.name} — ${formatCurrency(p.price, locale)} (${p.in_stock} in stock)`,
+								name: `${p.name} — ${formatCurrency(p.price, locale)} (${t("inStock", { count: p.in_stock })})`,
 							}))}
 							placeholder={t("addProduct")}
 							noSelect
@@ -462,7 +461,9 @@ export default function POSPage() {
 												<TableCell className="hidden md:table-cell">
 													<Badge
 														variant={
-															source && source.in_stock > 5
+															source &&
+															source.in_stock > 0 &&
+															!isBelowMinimum(source)
 																? "default"
 																: "destructive"
 														}
@@ -532,16 +533,6 @@ export default function POSPage() {
 							{tc("total")}: {formatCurrency(total, locale)}
 						</strong>
 						<div className="flex w-full items-center gap-3 sm:w-auto">
-							<label className="flex cursor-pointer select-none items-center gap-2 text-sm">
-								<input
-									type="checkbox"
-									checked={emitNfce}
-									onChange={(e) => setEmitNfce(e.target.checked)}
-									className="h-4 w-4 rounded border-gray-300"
-								/>
-								<ReceiptTextIcon className="h-4 w-4 text-muted-foreground" />
-								NFC-e
-							</label>
 							<Button
 								onClick={handleCreateOrder}
 								disabled={!canCreate || createOrderMutation.isPending}

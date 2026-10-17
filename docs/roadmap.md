@@ -13,8 +13,9 @@ Estado: POS rápido + atajos + arqueo hechos (ver `main`).
 ## P0 — lo que sigue
 1. **Fiado / cuenta corriente** — saldo por cliente, pagos parciales,
    límite de crédito, historial. El diferencial del almacén ("chau cuadernito").
-2. **Devoluciones / anulación** — anular venta o devolver ítem con reingreso
-   a stock (`OrderCancelled`/`Refund` en el event log).
+2. **Devoluciones / anulación** — anular venta o devolver ítem reintegrando
+   stock y revirtiendo el pago (`OrderCancelled`/`Refund` en el event log).
+   El estado "cancelado" de la UI se quitó: no revertía nada.
 3. **Balanza / peso variable** — etiquetas `20XXXXXPPPPP`, venta por kg
    (precio × peso). Sin esto no hay fiambrería/verdulería.
 4. **Listas de precios + aumento masivo** — minorista/mayorista, remarcación

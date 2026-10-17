@@ -3,15 +3,15 @@ import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Toaster } from "sonner";
-import { CookieConsent } from "@/components/cookie-consent";
 import { TRPCReactProvider } from "@/components/trpc-provider";
+import { APP_NAME } from "@/lib/config";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "FinOpenPOS",
-	description: "Open-source point of sale system",
+	title: APP_NAME,
+	description: "Punto de venta para almacenes de barrio",
 };
 
 export default async function RootLayout({
@@ -29,7 +29,6 @@ export default async function RootLayout({
 					<TRPCReactProvider>
 						<main>{children}</main>
 						<Toaster richColors position="bottom-right" />
-						<CookieConsent />
 					</TRPCReactProvider>
 				</NextIntlClientProvider>
 			</body>

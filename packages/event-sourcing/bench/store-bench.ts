@@ -1,10 +1,10 @@
 /**
- * Benchmark: decide o design do event store sobre PGlite.
+ * Benchmark: decide el diseño del event store sobre PGlite.
  *
- * Eixos medidos:
- *  1. Append: SQL cru (pglite.query) vs batch multi-row; payload jsonb vs text
- *  2. Replay (fold): ler N eventos ordenados e reconstruir estado — o caminho
- *     quente do sistema, já que TODA leitura reconstrói dos eventos (sem snapshot)
+ * Ejes medidos:
+ *  1. Append: SQL crudo (pglite.query) vs batch multi-row; payload jsonb vs text
+ *  2. Replay (fold): leer N eventos ordenados y reconstruir estado — el camino
+ *     caliente del sistema, ya que TODA lectura reconstruye desde los eventos (sin snapshot)
  *
  * Uso: bun bench/store-bench.ts [--json out.json]
  */
@@ -107,7 +107,7 @@ async function benchReplay(payloadType: "jsonb" | "text") {
 	const max = Math.max(...REPLAY_SIZES);
 	const pg = await makeDb(payloadType);
 
-	// seed com eventos distribuídos em 500 streams (create + updates)
+	// seed con eventos distribuidos en 500 streams (create + updates)
 	const SEED_BATCH = 500;
 	const versions = new Map<number, number>();
 	for (let i = 0; i < max; i += SEED_BATCH) {
@@ -138,7 +138,7 @@ async function benchReplay(payloadType: "jsonb" | "text") {
 	}
 
 	for (const n of REPLAY_SIZES) {
-		// warmup + 3 runs, pega a média
+		// warmup + 3 runs, saca el promedio
 		const runs = 3;
 		let total = 0;
 		for (let r = 0; r <= runs; r++) {
@@ -153,7 +153,7 @@ async function benchReplay(payloadType: "jsonb" | "text") {
          ORDER BY global_seq`,
 				["user-1", "product", n],
 			);
-			// fold: reconstrói o read model
+			// fold: reconstruye el read model
 			const state = new Map<number, Record<string, unknown>>();
 			for (const row of res.rows) {
 				const data =
@@ -185,5 +185,5 @@ const jsonFlag = process.argv.indexOf("--json");
 const jsonPath = jsonFlag !== -1 ? process.argv[jsonFlag + 1] : undefined;
 if (jsonPath) {
 	await Bun.write(jsonPath, JSON.stringify(results, null, 2));
-	console.log(`\nresultados salvos em ${jsonPath}`);
+	console.log(`\nresultados guardados en ${jsonPath}`);
 }

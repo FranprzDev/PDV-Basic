@@ -233,16 +233,16 @@ describe("orders.update", () => {
 			paymentMethodId,
 			products: [{ id: productId, quantity: 1 }],
 		});
-		const updated = await caller.update({ id: order.id, status: "cancelled" });
-		expect(updated.status).toBe("cancelled");
+		const updated = await caller.update({ id: order.id, status: "pending" });
+		expect(updated.status).toBe("pending");
 
 		const list = await caller.list();
 		const persisted = must(list.find((o) => o.id === order.id));
-		expect(persisted.status).toBe("cancelled");
+		expect(persisted.status).toBe("pending");
 		expect(persisted.total_amount).toBe(1000); // unchanged field preserved
 	});
 
-	it("rejects invalid status enum", async () => {
+	it("rejects the removed 'cancelled' status", async () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
@@ -251,7 +251,7 @@ describe("orders.update", () => {
 		await expect(
 			caller.update({
 				id: order.id,
-				status: "bogus" as unknown as "completed",
+				status: "cancelled" as unknown as "completed",
 			}),
 		).rejects.toThrow();
 
@@ -291,7 +291,7 @@ describe("orders.delete", () => {
 
 		await caller.delete({ id: order.id });
 
-		// O evento TransactionRecorded permanece no log — fatos não são apagados
+		// El evento TransactionRecorded permanece en el log — los hechos no se borran
 		const txns = (await listTransactions("user-1")).filter(
 			(t) => t.order_id === order.id,
 		);

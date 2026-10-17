@@ -34,6 +34,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { APP_NAME } from "@/lib/config";
 
 interface NavItem {
 	href: string;
@@ -136,7 +137,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 								onClick={() => setMobileMenuOpen(false)}
 							>
 								<Package2Icon className="h-6 w-6" />
-								<span>FinOpenPOS</span>
+								<span>{APP_NAME}</span>
 							</Link>
 							<Button
 								variant="ghost"

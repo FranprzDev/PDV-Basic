@@ -21,14 +21,14 @@ export {
 } from "./auth-schema";
 
 // ── Event Store ─────────────────────────────────────────────────────────────
-// Única fonte de verdade dos domínios operacionais (products, customers,
-// orders, transactions, payment methods). Todo estado é reconstruído por
-// replay dos eventos — não existem snapshots nem tabelas de estado.
+// Única fuente de verdad de los dominios operacionales (products, customers,
+// orders, transactions, payment methods). Todo estado se reconstruye por
+// replay de los eventos — no existen snapshots ni tablas de estado.
 //
-// Decisões de design (ver packages/event-sourcing/bench e docs/adr):
-//  - payload como text (JSON): fold sempre em JS → ~1.7x mais rápido que jsonb
-//  - UNIQUE (stream_type, stream_id, version): concorrência otimista
-//  - global_seq serial: ordem total do log (base de qualquer replay)
+// Decisiones de diseño (ver packages/event-sourcing/bench y docs/adr):
+//  - payload como text (JSON): fold siempre en JS → ~1.7x más rápido que jsonb
+//  - UNIQUE (stream_type, stream_id, version): concurrencia optimista
+//  - global_seq serial: orden total del log (base de cualquier replay)
 export const events = pgTable(
 	"events",
 	{

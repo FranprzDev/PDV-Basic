@@ -8,8 +8,8 @@ import {
 } from "./types";
 
 /**
- * Interface mínima de execução SQL — satisfeita pelo PGlite
- * (e por qualquer driver com `query(sql, params)`).
+ * Interfaz mínima de ejecución SQL — la satisface PGlite
+ * (y cualquier driver con `query(sql, params)`).
  */
 export interface Querier {
 	query<T>(query: string, params?: unknown[]): Promise<{ rows: T[] }>;
@@ -63,17 +63,17 @@ CREATE INDEX IF NOT EXISTS events_stream_idx
 /**
  * Event store append-only sobre Postgres/PGlite.
  *
- * Decisões de design (ver bench/store-bench.ts e docs/adr):
- *  - payload como `text` (JSON serializado): fold acontece sempre em JS,
- *    então jsonb só adicionaria custo de parse — text rende ~1.7x no replay.
- *  - append multi-row em um único INSERT: ~8x mais rápido que inserts unitários.
- *  - concorrência otimista via UNIQUE (stream_type, stream_id, version).
+ * Decisiones de diseño (ver bench/store-bench.ts y docs/adr):
+ *  - payload como `text` (JSON serializado): el fold ocurre siempre en JS,
+ *    así que jsonb solo agregaría costo de parse — text rinde ~1.7x en el replay.
+ *  - append multi-row en un único INSERT: ~8x más rápido que inserts unitarios.
+ *  - concurrencia optimista vía UNIQUE (stream_type, stream_id, version).
  */
 export interface EventStoreOptions {
 	/**
-	 * Observer chamado após cada append bem-sucedido (ex.: dispatcher de
-	 * addons). Erros do observer NÃO propagam para o comando — o fato já
-	 * foi persistido; efeitos colaterais são responsabilidade do observer.
+	 * Observer llamado después de cada append exitoso (ej.: dispatcher de
+	 * addons). Los errores del observer NO se propagan al comando — el hecho ya
+	 * fue persistido; los efectos colaterales son responsabilidad del observer.
 	 */
 	onAppended?: (events: StoredEvent[]) => void | Promise<void>;
 }
@@ -84,7 +84,7 @@ export class EventStore {
 		private readonly options: EventStoreOptions = {},
 	) {}
 
-	/** Cria a tabela/índices se não existirem (útil em testes e bootstrap). */
+	/** Crea la tabla/índices si no existen (útil en tests y bootstrap). */
 	async ensureSchema(): Promise<void> {
 		for (const stmt of EVENTS_TABLE_DDL.split(";")) {
 			if (stmt.trim()) await this.sql.query(stmt);
@@ -92,9 +92,9 @@ export class EventStore {
 	}
 
 	/**
-	 * Aloca o próximo id de stream para um tipo de agregado.
-	 * PGlite é single-writer (comandos serializam na mesma conexão); numa
-	 * corrida improvável, o UNIQUE do append rejeita e o comando é repetido.
+	 * Asigna el próximo id de stream para un tipo de agregado.
+	 * PGlite es single-writer (los comandos se serializan en la misma conexión); en una
+	 * carrera improbable, el UNIQUE del append rechaza y el comando se repite.
 	 */
 	async nextStreamId(streamType: string): Promise<number> {
 		const res = await this.sql.query<{ next: number }>(
@@ -104,7 +104,7 @@ export class EventStore {
 		return Number(res.rows[0]?.next ?? 1);
 	}
 
-	/** Grava eventos de um único stream (atalho para `appendMany`). */
+	/** Graba eventos de un único stream (atajo para `appendMany`). */
 	async append<TEvent extends DomainEvent>(
 		input: AppendInput<TEvent>,
 	): Promise<StoredEvent<TEvent>[]> {
@@ -122,13 +122,13 @@ export class EventStore {
 	}
 
 	/**
-	 * Grava eventos de um ou mais streams em um único INSERT — tudo grava ou
-	 * nada grava. É o que permite tratar um comando que toca vários agregados
-	 * (ex.: venda = pedido + baixa de estoque + pagamento) como um só fato.
+	 * Graba eventos de uno o más streams en un único INSERT — todo se graba o
+	 * nada se graba. Es lo que permite tratar un comando que toca varios agregados
+	 * (ej.: venta = pedido + baja de stock + pago) como un solo hecho.
 	 *
-	 * Cada stream declara sua versão esperada: se qualquer um deles tiver
-	 * mudado no meio-tempo, o UNIQUE (stream_type, stream_id, version) rejeita
-	 * o INSERT inteiro e lançamos `ConcurrencyError`.
+	 * Cada stream declara su versión esperada: si cualquiera de ellos hubiera
+	 * cambiado en el medio tiempo, el UNIQUE (stream_type, stream_id, version) rechaza
+	 * el INSERT entero y lanzamos `ConcurrencyError`.
 	 */
 	async appendMany<TEvent extends DomainEvent>(
 		streams: StreamAppend<TEvent>[],
@@ -191,15 +191,15 @@ export class EventStore {
 				try {
 					await this.options.onAppended(stored);
 				} catch {
-					// o fato já foi persistido; falha do observer não desfaz o comando
+					// el hecho ya fue persistido; una falla del observer no deshace el comando
 				}
 			}
 			return stored;
 		} catch (err) {
 			if (isUniqueViolation(err)) {
-				// O Postgres não informa qual stream colidiu: reportamos o
-				// primeiro do comando. A colisão é rara (PGlite é single-writer)
-				// e o chamador reexecuta o comando inteiro de qualquer forma.
+				// Postgres no informa qué stream colisionó: reportamos el
+				// primero del comando. La colisión es rara (PGlite es single-writer)
+				// y el llamador reejecuta el comando entero de todos modos.
 				const first = streams.find((s) => s.events.length > 0);
 				if (first) {
 					throw new ConcurrencyError(
@@ -213,7 +213,7 @@ export class EventStore {
 		}
 	}
 
-	/** Lê um stream específico, em ordem de versão. */
+	/** Lee un stream específico, en orden de versión. */
 	async readStream<TEvent extends DomainEvent>(
 		streamType: string,
 		streamId: number,
@@ -226,8 +226,8 @@ export class EventStore {
 	}
 
 	/**
-	 * Lê todos os eventos de um ou mais tipos de stream em ordem global —
-	 * insumo para reconstruir read models do zero a cada leitura.
+	 * Lee todos los eventos de uno o más tipos de stream en orden global —
+	 * insumo para reconstruir read models desde cero en cada lectura.
 	 */
 	async readAll<TEvent extends DomainEvent>(
 		streamTypes: string[],

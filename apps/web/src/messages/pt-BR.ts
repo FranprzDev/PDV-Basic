@@ -31,7 +31,6 @@ const messages: Messages = {
 		inactive: "Inativo",
 		completed: "Concluído",
 		pending: "Pendente",
-		cancelled: "Cancelado",
 		income: "Receita",
 		expense: "Despesa",
 		all: "Todos",
@@ -245,6 +244,7 @@ const messages: Messages = {
 		limitedStock: "Apenas {count} unidades de {name} disponíveis",
 		limitedUnits: "Apenas {count} unidades disponíveis",
 		belowMinimum: "{name} chegou ao estoque mínimo",
+		inStock: "{count} em estoque",
 		hotkeys: {
 			title: "Atalhos de teclado",
 			reset: "Redefinir",

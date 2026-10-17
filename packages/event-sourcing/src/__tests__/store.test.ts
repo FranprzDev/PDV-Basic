@@ -89,7 +89,7 @@ describe("EventStore", () => {
 			store.append<ProductEvent>({
 				streamType: "product",
 				streamId: id,
-				expectedVersion: 0, // stale: já existe version 1
+				expectedVersion: 0, // stale: ya existe la versión 1
 				userUid: "u1",
 				events: [{ type: "ProductPriceChanged", data: { price: 999 } }],
 			}),
@@ -174,7 +174,7 @@ describe("EventStore", () => {
 		expect(must(e0).occurredAt.toISOString()).toBe(when.toISOString());
 	});
 
-	it("appendMany escreve em vários streams em um só INSERT", async () => {
+	it("appendMany escribe en varios streams en un solo INSERT", async () => {
 		const stored = await store.appendMany<ProductEvent>(
 			[
 				{
@@ -213,7 +213,7 @@ describe("EventStore", () => {
 		});
 	});
 
-	it("appendMany é atômico: versão defasada rejeita o comando inteiro", async () => {
+	it("appendMany es atómico: versión desfasada rechaza el comando entero", async () => {
 		await store.append<ProductEvent>({
 			streamType: "atomic_b",
 			streamId: 1,
@@ -234,7 +234,7 @@ describe("EventStore", () => {
 					{
 						streamType: "atomic_b",
 						streamId: 1,
-						expectedVersion: 0, // defasada: atomic_b já está na versão 1
+						expectedVersion: 0, // defasada: atomic_b ya está en la versión 1
 						events: [{ type: "ProductPriceChanged", data: { price: 9 } }],
 					},
 				],
@@ -242,7 +242,7 @@ describe("EventStore", () => {
 			),
 		).rejects.toBeInstanceOf(ConcurrencyError);
 
-		// Nada foi gravado: o stream atomic_a continua vazio
+		// No se grabó nada: el stream atomic_a sigue vacío
 		expect(await store.readStream<ProductEvent>("atomic_a", 1)).toEqual([]);
 	});
 });
