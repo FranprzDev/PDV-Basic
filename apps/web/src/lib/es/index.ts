@@ -1,3 +1,4 @@
+export * from "./accounts";
 export * from "./customers";
 export * from "./orders";
 export * from "./payment-methods";

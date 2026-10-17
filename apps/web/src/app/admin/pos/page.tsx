@@ -67,6 +67,9 @@ export default function POSPage() {
 	const { data: paymentMethods = [], isLoading: loadingMethods } = useQuery(
 		trpc.paymentMethods.list.queryOptions(),
 	);
+	const { data: balances = [] } = useQuery(
+		trpc.customers.balances.queryOptions(),
+	);
 	const t = useTranslations("pos");
 	const tc = useTranslations("common");
 	const tOrders = useTranslations("orders");
@@ -81,10 +84,12 @@ export default function POSPage() {
 	const [paymentMethod, setPaymentMethod] = useState<{
 		id: number;
 		name: string;
+		is_account: boolean;
 	} | null>(null);
 	const [selectedCustomer, setSelectedCustomer] = useState<{
 		id: number;
 		name: string;
+		credit_limit: number | null;
 	} | null>(null);
 	const [productSearch, setProductSearch] = useState("");
 	const [lastScan, setLastScan] = useState<{
@@ -159,6 +164,7 @@ export default function POSPage() {
 			onSuccess: (order) => {
 				queryClient.invalidateQueries(trpc.orders.list.queryOptions());
 				queryClient.invalidateQueries(trpc.products.list.queryOptions());
+				queryClient.invalidateQueries(trpc.customers.balances.queryOptions());
 				toast.success(tOrders("createdSuccessfully"));
 
 				void printTicket({
@@ -269,10 +275,34 @@ export default function POSPage() {
 		0,
 	);
 
-	const canCreate = selectedProducts.length > 0 && Boolean(paymentMethod);
+	// Venta a cuenta (fiado): el cliente se lleva la mercadería y queda debiendo.
+	const balanceMap = useMemo(
+		() => new Map(balances.map((b) => [b.customer_id, b.balance])),
+		[balances],
+	);
+	const customerBalance = selectedCustomer
+		? (balanceMap.get(selectedCustomer.id) ?? 0)
+		: 0;
+	const onAccount = paymentMethod?.is_account ?? false;
+	const needsCustomer = onAccount && !selectedCustomer;
+	const available =
+		selectedCustomer && selectedCustomer.credit_limit !== null
+			? selectedCustomer.credit_limit - customerBalance
+			: null;
+	const overLimit = onAccount && available !== null && total > available;
+
+	const canCreate =
+		selectedProducts.length > 0 &&
+		Boolean(paymentMethod) &&
+		!needsCustomer &&
+		!overLimit;
 
 	const handleCreateOrder = () => {
-		if (!canCreate || !paymentMethod) return;
+		if (!canCreate || !paymentMethod) {
+			if (needsCustomer) toast.error(t("accountRequired"));
+			else if (overLimit) toast.error(t("creditExceeded"));
+			return;
+		}
 		createOrderMutation.mutate({
 			customerId: selectedCustomer?.id ?? null,
 			paymentMethodId: paymentMethod.id,
@@ -348,24 +378,48 @@ export default function POSPage() {
 				<CardHeader>
 					<CardTitle>{t("saleDetails")}</CardTitle>
 				</CardHeader>
-				<CardContent className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-					<div className="flex-1">
-						<Combobox
-							items={[
-								{ id: 0, name: ts("walkIn") },
-								...customers.map((c) => ({ id: c.id, name: c.name })),
-							]}
-							placeholder={ts("selectCustomer")}
-							onSelect={handleSelectCustomer}
-						/>
+				<CardContent className="flex flex-col gap-3">
+					<div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+						<div className="flex-1">
+							<Combobox
+								items={[
+									{ id: 0, name: ts("walkIn") },
+									...customers.map((c) => ({ id: c.id, name: c.name })),
+								]}
+								placeholder={ts("selectCustomer")}
+								onSelect={handleSelectCustomer}
+							/>
+						</div>
+						<div className="flex-1">
+							<Combobox
+								items={paymentMethods}
+								placeholder={t("selectPaymentMethod")}
+								onSelect={handleSelectPaymentMethod}
+							/>
+						</div>
 					</div>
-					<div className="flex-1">
-						<Combobox
-							items={paymentMethods}
-							placeholder={t("selectPaymentMethod")}
-							onSelect={handleSelectPaymentMethod}
-						/>
-					</div>
+					{onAccount ? (
+						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+							<Badge variant="secondary">{t("onAccount")}</Badge>
+							{selectedCustomer ? (
+								<span className="text-muted-foreground">
+									{t("accountBalance", {
+										amount: formatCurrency(customerBalance, locale),
+									})}
+									{available !== null
+										? ` · ${t("accountAvailable", {
+												amount: formatCurrency(Math.max(available, 0), locale),
+											})}`
+										: ""}
+								</span>
+							) : (
+								<span className="text-amber-600">{t("accountRequired")}</span>
+							)}
+							{overLimit ? (
+								<span className="text-destructive">{t("creditExceeded")}</span>
+							) : null}
+						</div>
+					) : null}
 				</CardContent>
 			</Card>
 			<Card>

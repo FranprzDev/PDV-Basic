@@ -4,7 +4,9 @@ import type {
 	StreamAppend,
 } from "@finopenpos/event-sourcing";
 import { foldStream, foldStreams } from "@finopenpos/event-sourcing";
-import { customerMap } from "./customers";
+import { type AccountEvent, findAccountCharge, loadAccount } from "./accounts";
+import { customerMap, loadCustomer } from "./customers";
+import { findPaymentMethod } from "./payment-methods";
 import {
 	loadProduct,
 	type ProductEvent,
@@ -185,6 +187,10 @@ export type OrderErrorCode =
 	| "invalid_quantity"
 	| "product_not_found"
 	| "insufficient_stock"
+	| "payment_method_not_found"
+	| "customer_not_found"
+	| "customer_required"
+	| "credit_limit_exceeded"
 	| "not_cancellable";
 
 /** Error de negocio de una venta: el router lo traduce a un código tRPC. */
@@ -198,10 +204,16 @@ export class OrderError extends Error {
 	}
 }
 
+/** Importe en centavos → texto para mensajes de error. */
+function money(cents: number): string {
+	return `$${(cents / 100).toFixed(2)}`;
+}
+
 /**
- * Flujo de venta del POS: un pedido es un solo hecho que toca tres agregados —
- * `OrderPlaced` (pedido), `StockDecremented` por ítem (stock) y
- * `TransactionRecorded` (pago) — grabados en un único append atómico.
+ * Flujo de venta del POS: un pedido es un solo hecho que toca varios agregados —
+ * `OrderPlaced` (pedido) y `StockDecremented` por ítem (stock), más el cobro:
+ * `TransactionRecorded` (contado) o `AccountCharged` (fiado) — grabados en un
+ * único append atómico.
  *
  * El precio y el total salen del catálogo del servidor: el cliente solo manda qué y
  * cuánto. El stock se valida y se descuenta acá, no en el navegador.
@@ -216,6 +228,16 @@ export async function placeOrder(
 			"La venta necesita al menos un producto.",
 		);
 	}
+
+	// El medio de pago define si la venta se cobra o se fía al cliente.
+	const method = await findPaymentMethod(input.paymentMethodId);
+	if (!method) {
+		throw new OrderError(
+			"payment_method_not_found",
+			`El medio de pago ${input.paymentMethodId} no existe.`,
+		);
+	}
+	const onAccount = method.is_account;
 
 	// Cantidad por producto: el POS no manda duplicados, pero la API es pública.
 	const requested = new Map<number, number>();
@@ -272,11 +294,77 @@ export async function placeOrder(
 		0,
 	);
 	const orderId = await eventStore.nextStreamId(STREAM.order);
-	const transactionId = await eventStore.nextStreamId(STREAM.transaction);
 
-	// Un solo INSERT: pedido + baja de stock + pago. Todo se graba o nada se graba.
+	// Venta a cuenta (fiado): se fía al cliente en vez de cobrarse. Necesita
+	// cliente y, si tiene tope, que la deuda no se pase. El cargo y el pedido
+	// se graban juntos, así el saldo nunca queda descuadrado.
+	let status = "completed";
+	let settlement: StreamAppend<
+		OrderEvent | TransactionEvent | ProductEvent | AccountEvent
+	>;
+	if (onAccount) {
+		if (input.customerId === null) {
+			throw new OrderError(
+				"customer_required",
+				"Las ventas a cuenta necesitan un cliente.",
+			);
+		}
+		const { state: customer } = await loadCustomer(input.customerId);
+		if (!customer || customer.user_uid !== userUid) {
+			throw new OrderError(
+				"customer_not_found",
+				`El cliente ${input.customerId} no existe.`,
+			);
+		}
+		const { state: account, version: accountVersion } = await loadAccount(
+			input.customerId,
+		);
+		const balance = account?.user_uid === userUid ? account.balance : 0;
+		if (
+			customer.credit_limit !== null &&
+			balance + total > customer.credit_limit
+		) {
+			throw new OrderError(
+				"credit_limit_exceeded",
+				`El límite de fiado de ${customer.name} es ${money(customer.credit_limit)} y ya debe ${money(balance)}.`,
+			);
+		}
+		status = "pending";
+		settlement = {
+			streamType: STREAM.account,
+			streamId: input.customerId,
+			expectedVersion: accountVersion,
+			events: [
+				{ type: "AccountCharged", data: { order_id: orderId, amount: total } },
+			],
+		};
+	} else {
+		const transactionId = await eventStore.nextStreamId(STREAM.transaction);
+		settlement = {
+			streamType: STREAM.transaction,
+			streamId: transactionId,
+			expectedVersion: 0,
+			events: [
+				{
+					type: "TransactionRecorded",
+					data: {
+						order_id: orderId,
+						payment_method_id: input.paymentMethodId,
+						amount: total,
+						status: "completed",
+						category: "selling",
+						type: "income",
+						description: `Venta #${orderId}`,
+					},
+				},
+			],
+		};
+	}
+
+	// Un solo INSERT: pedido + baja de stock + cobro (o cargo a cuenta). Todo se
+	// graba o nada se graba.
 	const stored = await eventStore.appendMany<
-		OrderEvent | TransactionEvent | ProductEvent
+		OrderEvent | TransactionEvent | ProductEvent | AccountEvent
 	>(
 		[
 			{
@@ -289,32 +377,14 @@ export async function placeOrder(
 						data: {
 							customer_id: input.customerId,
 							total_amount: total,
-							status: "completed",
+							status,
 							items,
 						},
 					},
 				],
 			},
 			...stockStreams,
-			{
-				streamType: STREAM.transaction,
-				streamId: transactionId,
-				expectedVersion: 0,
-				events: [
-					{
-						type: "TransactionRecorded",
-						data: {
-							order_id: orderId,
-							payment_method_id: input.paymentMethodId,
-							amount: total,
-							status: "completed",
-							category: "selling",
-							type: "income",
-							description: `Payment for order #${orderId}`,
-						},
-					},
-				],
-			},
+			settlement,
 		],
 		{ userUid },
 	);
@@ -368,12 +438,13 @@ export async function deleteOrder(userUid: string, id: number): Promise<void> {
 }
 
 /**
- * Anula una venta como un hecho nuevo (nunca se edita el pasado): en un único
- * append atómico `OrderCancelled` marca el pedido, `StockRestocked` reintegra
- * las unidades que la venta había descontado y `TransactionRecorded` con
- * importe negativo revierte el pago en el mismo medio.
+ * Anula una venta como un hecho nuevo (nunca se edita el pasado) en un único
+ * append atómico: `OrderCancelled` marca el pedido, `StockRestocked` reintegra
+ * las unidades que la venta había descontado y se revierte el cobro — con
+ * `TransactionRecorded` de importe negativo (venta cobrada) o
+ * `AccountChargeCancelled` (venta fiada)—.
  *
- * A diferencia de borrar, la venta y su pago siguen en el log: queda auditado.
+ * A diferencia de borrar, la venta y su cobro siguen en el log: queda auditado.
  */
 export async function cancelOrder(
 	userUid: string,
@@ -416,19 +487,38 @@ export async function cancelOrder(
 		(t) => t.order_id === id && t.category !== "refund",
 	);
 
-	const streams: StreamAppend<OrderEvent | TransactionEvent | ProductEvent>[] =
-		[
-			{
-				streamType: STREAM.order,
-				streamId: id,
-				expectedVersion: version,
-				events: [{ type: "OrderCancelled", data: {} }],
-			},
-			...stockStreams,
-		];
+	const streams: StreamAppend<
+		OrderEvent | TransactionEvent | ProductEvent | AccountEvent
+	>[] = [
+		{
+			streamType: STREAM.order,
+			streamId: id,
+			expectedVersion: version,
+			events: [{ type: "OrderCancelled", data: {} }],
+		},
+		...stockStreams,
+	];
 
-	// Si la venta nunca generó una transacción (p. ej. un pedido pendiente), no
-	// hay dinero que revertir: sólo se anula y se reintegra el stock.
+	// Si la venta fue fiada, se devuelve el saldo de la cuenta corriente.
+	const charge = await findAccountCharge(userUid, id);
+	if (charge) {
+		const { version: accountVersion } = await loadAccount(charge.customer_id);
+		streams.push({
+			streamType: STREAM.account,
+			streamId: charge.customer_id,
+			expectedVersion: accountVersion,
+			events: [
+				{
+					type: "AccountChargeCancelled",
+					data: { order_id: id, amount: charge.amount },
+				},
+			],
+		});
+	}
+
+	// Si la venta nunca generó una transacción (fiado o pedido pendiente), no hay
+	// dinero que revertir: sólo se anula, se reintegra el stock y —si era
+	// fiada— se devuelve el saldo.
 	if (original) {
 		streams.push({
 			streamType: STREAM.transaction,
@@ -452,7 +542,7 @@ export async function cancelOrder(
 	}
 
 	const stored = await eventStore.appendMany<
-		OrderEvent | TransactionEvent | ProductEvent
+		OrderEvent | TransactionEvent | ProductEvent | AccountEvent
 	>(streams, { userUid });
 
 	const cancelled = stored.find(

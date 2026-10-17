@@ -1,6 +1,7 @@
 import { faker } from "@faker-js/faker";
 import { sql } from "drizzle-orm";
 import {
+	type AccountEvent,
 	type CustomerEvent,
 	eventStore,
 	type OrderEvent,
@@ -44,13 +45,15 @@ export async function seed() {
 	const userId = signUpRes.user.id;
 
 	// ── Payment Methods ──────────────────────────────────────────────────────
-	const paymentMethodIds: number[] = [];
-	for (const name of [
-		"Efectivo",
-		"Tarjeta de débito",
-		"Tarjeta de crédito",
-		"Transferencia",
-		"Mercado Pago",
+	/** Medios que cobran en el acto (la cuenta corriente no entra acá). */
+	const cashMethodIds: number[] = [];
+	for (const method of [
+		{ name: "Efectivo" },
+		{ name: "Tarjeta de débito" },
+		{ name: "Tarjeta de crédito" },
+		{ name: "Transferencia" },
+		{ name: "Mercado Pago" },
+		{ name: "Cuenta corriente", is_account: true },
 	]) {
 		const id = await eventStore.nextStreamId(STREAM.paymentMethod);
 		await eventStore.append<PaymentMethodEvent>({
@@ -58,15 +61,17 @@ export async function seed() {
 			streamId: id,
 			expectedVersion: 0,
 			userUid: userId,
-			events: [{ type: "PaymentMethodCreated", data: { name } }],
+			events: [{ type: "PaymentMethodCreated", data: method }],
 		});
-		paymentMethodIds.push(id);
+		if (!method.is_account) cashMethodIds.push(id);
 	}
 
 	// ── Customers ────────────────────────────────────────────────────────────
 	const customerIds: number[] = [];
+	const customerNames = new Map<number, string>();
 	for (let i = 0; i < 20; i++) {
 		const id = await eventStore.nextStreamId(STREAM.customer);
+		const name = faker.person.fullName();
 		await eventStore.append<CustomerEvent>({
 			streamType: STREAM.customer,
 			streamId: id,
@@ -77,7 +82,7 @@ export async function seed() {
 				{
 					type: "CustomerCreated",
 					data: {
-						name: faker.person.fullName(),
+						name,
 						email: faker.internet.email().toLowerCase(),
 						phone: faker.phone.number({ style: "national" }),
 						status: faker.helpers.arrayElement([
@@ -86,12 +91,21 @@ export async function seed() {
 							"active",
 							"inactive",
 						]),
+						// La mitad tiene tope de fiado; el resto, sin tope.
+						credit_limit: faker.helpers.maybe(
+							() => faker.number.int({ min: 500000, max: 3000000 }),
+							{ probability: 0.5 },
+						),
 					},
 				},
 			],
 		});
 		customerIds.push(id);
+		customerNames.set(id, name);
 	}
+	/** Saldo y versión del stream de cuenta por cliente (para el seed). */
+	const accountBalances = new Map<number, number>();
+	const accountVersions = new Map<number, number>();
 
 	// ── Products ─────────────────────────────────────────────────────────────
 	const seededProducts: { id: number; price: number }[] = [];
@@ -124,7 +138,7 @@ export async function seed() {
 	const orderCount = 40;
 	for (let i = 0; i < orderCount; i++) {
 		const customerId = faker.helpers.arrayElement(customerIds);
-		const pmId = faker.helpers.arrayElement(paymentMethodIds);
+		const pmId = faker.helpers.arrayElement(cashMethodIds);
 		const itemCount = faker.number.int({ min: 1, max: 5 });
 		const chosenProducts = faker.helpers.arrayElements(
 			seededProducts,
@@ -180,7 +194,7 @@ export async function seed() {
 					{
 						type: "TransactionRecorded",
 						data: {
-							description: `Payment for order #${orderId}`,
+							description: `Venta #${orderId}`,
 							order_id: orderId,
 							payment_method_id: pmId,
 							amount: totalAmount,
@@ -191,7 +205,76 @@ export async function seed() {
 					},
 				],
 			});
+		} else {
+			// Venta fiada (pending): queda como saldo en la cuenta del cliente.
+			const version = accountVersions.get(customerId) ?? 0;
+			await eventStore.append<AccountEvent>({
+				streamType: STREAM.account,
+				streamId: customerId,
+				expectedVersion: version,
+				userUid: userId,
+				occurredAt: createdAt,
+				events: [
+					{
+						type: "AccountCharged",
+						data: { order_id: orderId, amount: totalAmount },
+					},
+				],
+			});
+			accountVersions.set(customerId, version + 1);
+			accountBalances.set(
+				customerId,
+				(accountBalances.get(customerId) ?? 0) + totalAmount,
+			);
 		}
+	}
+
+	// ── Account payments (cobros de fiado) ───────────────────────────────────
+	const indebted = [...accountBalances.entries()].filter(
+		([, balance]) => balance > 0,
+	);
+	let accountPayments = 0;
+	for (const [customerId, balance] of indebted.slice(0, 6)) {
+		const amount =
+			accountPayments % 2 === 0
+				? balance // pago total
+				: Math.max(1, Math.floor(balance * 0.4)); // pago parcial
+		if (amount <= 0) continue;
+
+		const paidAt = faker.date.recent({ days: 15 });
+		const version = accountVersions.get(customerId) ?? 0;
+		await eventStore.append<AccountEvent>({
+			streamType: STREAM.account,
+			streamId: customerId,
+			expectedVersion: version,
+			userUid: userId,
+			occurredAt: paidAt,
+			events: [{ type: "AccountPaid", data: { amount } }],
+		});
+		accountVersions.set(customerId, version + 1);
+
+		const txId = await eventStore.nextStreamId(STREAM.transaction);
+		await eventStore.append<TransactionEvent>({
+			streamType: STREAM.transaction,
+			streamId: txId,
+			expectedVersion: 0,
+			userUid: userId,
+			occurredAt: paidAt,
+			events: [
+				{
+					type: "TransactionRecorded",
+					data: {
+						description: `Pago a cuenta — ${customerNames.get(customerId) ?? "cliente"}`,
+						payment_method_id: faker.helpers.arrayElement(cashMethodIds),
+						amount,
+						type: "income",
+						category: "selling",
+						status: "completed",
+					},
+				},
+			],
+		});
+		accountPayments += 1;
 	}
 
 	// ── Expense Transactions ─────────────────────────────────────────────────
@@ -222,7 +305,7 @@ export async function seed() {
 					type: "TransactionRecorded",
 					data: {
 						description: descriptions[category](),
-						payment_method_id: faker.helpers.arrayElement(paymentMethodIds),
+						payment_method_id: faker.helpers.arrayElement(cashMethodIds),
 						amount: faker.number.int({ min: 2000, max: 150000 }),
 						type: "expense",
 						category,
@@ -237,8 +320,9 @@ export async function seed() {
 	}
 
 	console.log(
-		`Seeded (event log): 3 payment methods, 1 demo user (${DEMO_EMAIL} / ${DEMO_PASSWORD}), ` +
+		`Seeded (event log): 6 payment methods, 1 demo user (${DEMO_EMAIL} / ${DEMO_PASSWORD}), ` +
 			`20 customers, ${seededProducts.length} products, ` +
-			`${orderCount} orders, ${expenseCount} expense transactions`,
+			`${orderCount} orders (con ventas fiadas), ${accountPayments} pagos a cuenta, ` +
+			`${expenseCount} expense transactions`,
 	);
 }

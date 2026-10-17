@@ -16,6 +16,10 @@ const ORDER_ERROR_CODES = {
 	product_not_found: "NOT_FOUND",
 	insufficient_stock: "CONFLICT",
 	not_cancellable: "CONFLICT",
+	payment_method_not_found: "NOT_FOUND",
+	customer_not_found: "NOT_FOUND",
+	customer_required: "BAD_REQUEST",
+	credit_limit_exceeded: "PRECONDITION_FAILED",
 } as const;
 
 const orderWithCustomerSchema = z.object({

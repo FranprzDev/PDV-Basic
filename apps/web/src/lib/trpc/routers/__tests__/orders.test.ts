@@ -10,6 +10,7 @@ const {
 	createCustomer,
 	createProduct,
 	createPaymentMethod,
+	getAccount,
 	listProducts,
 	listTransactions,
 } = await import("@/lib/es");
@@ -436,5 +437,164 @@ describe("orders.create — precio mayorista", () => {
 			products: [{ id: product.id, quantity: 5 }],
 		});
 		expect(order.total_amount).toBe(5000);
+	});
+});
+
+describe("orders.create — venta a cuenta (fiado)", () => {
+	it("fía la venta: queda pendiente, sin transacción y con saldo en la cuenta", async () => {
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			"Cuenta-Fiado-1",
+			true,
+		);
+		const fiadoCustomer = await createCustomer("user-1", {
+			name: "Fiado Uno",
+			email: "fiado1@t.com",
+			credit_limit: 100000,
+		});
+		const product = await createProduct("user-1", {
+			name: "Fiado Product",
+			price: 1500,
+			in_stock: 10,
+		});
+
+		const order = await caller.create({
+			customerId: fiadoCustomer.id,
+			paymentMethodId: accountMethod.id,
+			products: [{ id: product.id, quantity: 2 }],
+		});
+		expect(order.status).toBe("pending");
+		expect(order.total_amount).toBe(3000);
+
+		// No hay ingreso: el dinero todavía no entró, así que no se registra caja.
+		const txns = (await listTransactions("user-1")).filter(
+			(t) => t.order_id === order.id,
+		);
+		expect(txns.length).toBe(0);
+
+		// La deuda quedó cargada a la cuenta corriente del cliente.
+		const account = await getAccount("user-1", fiadoCustomer.id);
+		expect(account.balance).toBe(3000);
+		const movement = must(account.movements[0]);
+		expect(account.movements.length).toBe(1);
+		expect(movement.type).toBe("charge");
+		expect(movement.order_id).toBe(order.id);
+		expect(movement.amount).toBe(3000);
+		expect(await stockOf(product.id)).toBe(8);
+	});
+
+	it("rechaza una venta a cuenta sin cliente", async () => {
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			"Cuenta-Fiado-2",
+			true,
+		);
+		await expect(
+			caller.create({
+				customerId: null,
+				paymentMethodId: accountMethod.id,
+				products: [{ id: productId, quantity: 1 }],
+			}),
+		).rejects.toThrow(/necesitan un cliente/);
+	});
+
+	it("rechaza si la venta supera el tope de fiado — nada se escribe", async () => {
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			"Cuenta-Fiado-3",
+			true,
+		);
+		const limited = await createCustomer("user-1", {
+			name: "Tope Bajo",
+			email: "tope@t.com",
+			credit_limit: 1000,
+		});
+		const product = await createProduct("user-1", {
+			name: "Cara",
+			price: 600,
+			in_stock: 10,
+		});
+
+		// 2 × 600 = 1200 > 1000 de tope.
+		await expect(
+			caller.create({
+				customerId: limited.id,
+				paymentMethodId: accountMethod.id,
+				products: [{ id: product.id, quantity: 2 }],
+			}),
+		).rejects.toThrow(/límite de fiado/);
+
+		expect(await stockOf(product.id)).toBe(10);
+		expect((await getAccount("user-1", limited.id)).balance).toBe(0);
+	});
+
+	it("acumula la deuda y cuenta el tope contra el saldo existente", async () => {
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			"Cuenta-Fiado-5",
+			true,
+		);
+		const customer = await createCustomer("user-1", {
+			name: "Acumula",
+			email: "acumula@t.com",
+			credit_limit: 5000,
+		});
+		const product = await createProduct("user-1", {
+			name: "Acumula Product",
+			price: 2000,
+			in_stock: 10,
+		});
+
+		await caller.create({
+			customerId: customer.id,
+			paymentMethodId: accountMethod.id,
+			products: [{ id: product.id, quantity: 2 }],
+		});
+		expect((await getAccount("user-1", customer.id)).balance).toBe(4000);
+
+		// 4000 + 2000 = 6000 > 5000.
+		await expect(
+			caller.create({
+				customerId: customer.id,
+				paymentMethodId: accountMethod.id,
+				products: [{ id: product.id, quantity: 1 }],
+			}),
+		).rejects.toThrow(/límite de fiado/);
+		expect((await getAccount("user-1", customer.id)).balance).toBe(4000);
+	});
+
+	it("al anular una venta fiada devuelve el saldo y no reintegra dinero", async () => {
+		const accountMethod = await createPaymentMethod(
+			"user-1",
+			"Cuenta-Fiado-4",
+			true,
+		);
+		const customer = await createCustomer("user-1", {
+			name: "Fiado Cancel",
+			email: "fiadocancel@t.com",
+		});
+		const product = await createProduct("user-1", {
+			name: "Fiado Cancel Product",
+			price: 1000,
+			in_stock: 5,
+		});
+		const order = await caller.create({
+			customerId: customer.id,
+			paymentMethodId: accountMethod.id,
+			products: [{ id: product.id, quantity: 3 }],
+		});
+		expect((await getAccount("user-1", customer.id)).balance).toBe(3000);
+		expect(await stockOf(product.id)).toBe(2);
+
+		await caller.cancel({ id: order.id });
+
+		expect((await getAccount("user-1", customer.id)).balance).toBe(0);
+		expect(await stockOf(product.id)).toBe(5);
+
+		// Nunca se cobró: no hay reintegro de dinero.
+		const txns = (await listTransactions("user-1")).filter(
+			(t) => t.order_id === order.id,
+		);
+		expect(txns.length).toBe(0);
 	});
 });

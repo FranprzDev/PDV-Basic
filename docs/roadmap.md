@@ -11,20 +11,21 @@ Estado: POS rápido + atajos + arqueo hechos (ver `main`).
 - Stock mínimo + alerta (endpoint lowStock, tarjeta en dashboard, aviso en POS)
 - Listas de precios: precio mayorista por cantidad (regla compartida servidor/POS)
   + ajuste masivo por % con redondeo y previsualización
+- **Fiado / cuenta corriente**: saldo por cliente, ventas a cuenta, pagos
+  parciales, tope de crédito y estado de cuenta (stream `account` +
+  `AccountCharged`/`AccountPaid`/`AccountChargeCancelled`)
 - Arqueo de caja por medio de pago + gráfico
 - Seed demo, CI, lint/tipos/tests en verde
 
 ## P0 — lo que sigue
-1. **Fiado / cuenta corriente** — saldo por cliente, pagos parciales,
-   límite de crédito, historial. El diferencial del almacén ("chau cuadernito").
-2. **Balanza / peso variable** — etiquetas `20XXXXXPPPPP`, venta por kg
+1. **Balanza / peso variable** — etiquetas `20XXXXXPPPPP`, venta por kg
    (precio × peso). Sin esto no hay fiambrería/verdulería.
-3. **Proveedores + ingreso de mercadería** — remito de compra que suma stock
+2. **Proveedores + ingreso de mercadería** — remito de compra que suma stock
    y registra costo real.
-4. **ARCA / factura electrónica** — Factura C + CAE + QR, cola offline.
+3. **ARCA / factura electrónica** — Factura C + CAE + QR, cola offline.
    Último: alto esfuerzo y dependencia externa.
 
-Orden sugerido: 1 → 2 → 3 → 4.
+Orden sugerido: 1 → 2 → 3.
 
 ## P1 / P2 (después)
 - Vencimientos/lotes, pago mixto + QR con acreditación, multi-sucursal,

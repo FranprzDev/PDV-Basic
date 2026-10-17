@@ -78,6 +78,20 @@ describe("paymentMethods.create", () => {
 		expect(dups.length).toBe(1);
 		expect(dups[0].id).toBe(first.id);
 	});
+
+	it("marca el medio como 'a cuenta' cuando se pide", async () => {
+		const cash = await caller.create({ name: "Efectivo-Test" });
+		expect(cash.is_account).toBe(false);
+
+		const account = await caller.create({
+			name: "Cuenta-Test",
+			is_account: true,
+		});
+		expect(account.is_account).toBe(true);
+
+		const list = await caller.list();
+		expect(must(list.find((x) => x.id === account.id)).is_account).toBe(true);
+	});
 });
 
 describe("paymentMethods.update", () => {

@@ -13,6 +13,7 @@ export const eventStore = new EventStore({
 export const STREAM = {
 	product: "product",
 	customer: "customer",
+	account: "account",
 	order: "order",
 	transaction: "transaction",
 	paymentMethod: "payment_method",

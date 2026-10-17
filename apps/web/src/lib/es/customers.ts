@@ -8,6 +8,8 @@ export interface CustomerCreatedData {
 	email: string;
 	phone?: string;
 	status?: string;
+	/** Tope de fiado en centavos. null = sin tope. */
+	credit_limit?: number | null;
 }
 
 export type CustomerUpdatedData = Partial<CustomerCreatedData>;
@@ -24,6 +26,7 @@ export interface Customer {
 	email: string;
 	phone: string | null;
 	status: string | null;
+	credit_limit: number | null;
 	user_uid: string;
 	created_at: Date;
 }
@@ -47,6 +50,7 @@ export function customerReducer(
 				email: d.email,
 				phone: d.phone ?? null,
 				status: d.status ?? null,
+				credit_limit: d.credit_limit ?? null,
 				user_uid: event.userUid,
 				created_at: event.occurredAt,
 			};
