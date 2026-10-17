@@ -6,8 +6,13 @@ mock.module("@/lib/db", () => ({ db, pglite: pg }));
 
 const { ordersRouter } = await import("../orders");
 const { createCallerFactory } = await import("../../init");
-const { createCustomer, createProduct, createPaymentMethod, listTransactions } =
-	await import("@/lib/es");
+const {
+	createCustomer,
+	createProduct,
+	createPaymentMethod,
+	listProducts,
+	listTransactions,
+} = await import("@/lib/es");
 
 const caller = createCallerFactory(ordersRouter)({ user: makeUser("user-1") });
 const callerAs = (uid: string) =>
@@ -41,6 +46,11 @@ afterAll(async () => {
 	await pg.close();
 });
 
+async function stockOf(id: number): Promise<number> {
+	const products = await listProducts("user-1");
+	return must(products.find((p) => p.id === id)).in_stock;
+}
+
 describe("orders.list", () => {
 	it("returns empty array initially", async () => {
 		const list = await caller.list();
@@ -52,8 +62,7 @@ describe("orders.list", () => {
 		await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 2, price: 1000 }],
-			total: 2000,
+			products: [{ id: productId, quantity: 2 }],
 		});
 
 		const list = await caller.list();
@@ -82,8 +91,7 @@ describe("orders.create", () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 3, price: 1000 }],
-			total: 3000,
+			products: [{ id: productId, quantity: 3 }],
 		});
 
 		expect(order.id).toBeGreaterThan(0);
@@ -119,18 +127,102 @@ describe("orders.create", () => {
 		expect(txns[0].payment_method_id).toBe(paymentMethodId);
 	});
 
-	it("rejects quantity: 0 — no order created", async () => {
-		const before = await caller.list();
+	it("uses the server price, not whatever the client sends", async () => {
+		// Un cliente viejo todavía manda price/total: no debe poder fijar el monto.
+		const staleClientPayload: unknown = {
+			customerId,
+			paymentMethodId,
+			products: [{ id: productId, quantity: 2, price: 1 }],
+			total: 1,
+		};
+		const order = await caller.create(
+			staleClientPayload as Parameters<typeof caller.create>[0],
+		);
+		expect(order.total_amount).toBe(2000);
+	});
+});
+
+describe("orders.create — stock", () => {
+	it("decrements stock for each item sold", async () => {
+		const product = await createProduct("user-1", {
+			name: "Stock Product",
+			price: 2500,
+			in_stock: 10,
+		});
+		expect(await stockOf(product.id)).toBe(10);
+
+		await caller.create({
+			customerId: null,
+			paymentMethodId,
+			products: [{ id: product.id, quantity: 4 }],
+		});
+
+		expect(await stockOf(product.id)).toBe(6);
+	});
+
+	it("agrega líneas repetidas en una sola baja por producto", async () => {
+		const product = await createProduct("user-1", {
+			name: "Repeat Product",
+			price: 100,
+			in_stock: 5,
+		});
+		await caller.create({
+			customerId: null,
+			paymentMethodId,
+			products: [
+				{ id: product.id, quantity: 2 },
+				{ id: product.id, quantity: 1 },
+			],
+		});
+		expect(await stockOf(product.id)).toBe(2);
+	});
+
+	it("rejects a sale over available stock — nothing is written", async () => {
+		const product = await createProduct("user-1", {
+			name: "Scarce Product",
+			price: 500,
+			in_stock: 2,
+		});
+		const ordersBefore = (await caller.list()).length;
+		const txnsBefore = (await listTransactions("user-1")).length;
+
+		await expect(
+			caller.create({
+				customerId: null,
+				paymentMethodId,
+				products: [{ id: product.id, quantity: 3 }],
+			}),
+		).rejects.toThrow(/Stock insuficiente/);
+
+		expect(await stockOf(product.id)).toBe(2);
+		expect((await caller.list()).length).toBe(ordersBefore);
+		expect((await listTransactions("user-1")).length).toBe(txnsBefore);
+	});
+
+	it("rejects an unknown product — nothing is written", async () => {
+		const ordersBefore = (await caller.list()).length;
+		await expect(
+			caller.create({
+				customerId: null,
+				paymentMethodId,
+				products: [{ id: 999999, quantity: 1 }],
+			}),
+		).rejects.toThrow(/no existe/);
+		expect((await caller.list()).length).toBe(ordersBefore);
+	});
+
+	it("rejects quantity: 0 — no order created, stock untouched", async () => {
+		const before = (await caller.list()).length;
+		const stockBefore = await stockOf(productId);
 		await expect(
 			caller.create({
 				customerId,
 				paymentMethodId,
-				products: [{ id: productId, quantity: 0, price: 1000 }],
-				total: 0,
+				products: [{ id: productId, quantity: 0 }],
 			}),
 		).rejects.toThrow();
-		const after = await caller.list();
-		expect(after.length).toBe(before.length);
+		expect((await caller.list()).length).toBe(before);
+		expect(await stockOf(productId)).toBe(stockBefore);
 	});
 });
 
@@ -139,8 +231,7 @@ describe("orders.update", () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 1, price: 500 }],
-			total: 500,
+			products: [{ id: productId, quantity: 1 }],
 		});
 		const updated = await caller.update({ id: order.id, status: "cancelled" });
 		expect(updated.status).toBe("cancelled");
@@ -148,15 +239,14 @@ describe("orders.update", () => {
 		const list = await caller.list();
 		const persisted = must(list.find((o) => o.id === order.id));
 		expect(persisted.status).toBe("cancelled");
-		expect(persisted.total_amount).toBe(500); // unchanged field preserved
+		expect(persisted.total_amount).toBe(1000); // unchanged field preserved
 	});
 
 	it("rejects invalid status enum", async () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 1, price: 500 }],
-			total: 500,
+			products: [{ id: productId, quantity: 1 }],
 		});
 		await expect(
 			caller.update({
@@ -177,8 +267,7 @@ describe("orders.delete", () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 1, price: 100 }],
-			total: 100,
+			products: [{ id: productId, quantity: 1 }],
 		});
 
 		const before = await caller.list();
@@ -197,8 +286,7 @@ describe("orders.delete", () => {
 		const order = await caller.create({
 			customerId,
 			paymentMethodId,
-			products: [{ id: productId, quantity: 1, price: 100 }],
-			total: 100,
+			products: [{ id: productId, quantity: 1 }],
 		});
 
 		await caller.delete({ id: order.id });
@@ -208,7 +296,7 @@ describe("orders.delete", () => {
 			(t) => t.order_id === order.id,
 		);
 		expect(txns.length).toBe(1);
-		expect(txns[0].amount).toBe(100);
+		expect(txns[0].amount).toBe(1000);
 	});
 
 	it("is idempotent — deleting non-existent id is no-op", async () => {

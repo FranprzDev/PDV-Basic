@@ -4,10 +4,17 @@ import {
 	deleteOrder,
 	getOrderDetail,
 	listOrders,
+	OrderError,
 	placeOrder,
 	updateOrder,
 } from "@/lib/es";
 import { protectedProcedure, router } from "../init";
+
+const ORDER_ERROR_CODES = {
+	invalid_quantity: "BAD_REQUEST",
+	product_not_found: "NOT_FOUND",
+	insufficient_stock: "CONFLICT",
+} as const;
 
 const orderWithCustomerSchema = z.object({
 	id: z.number(),
@@ -64,24 +71,30 @@ export const ordersRouter = router({
 					z.object({
 						id: z.number(),
 						quantity: z.number().int().positive(),
-						price: z.number().int(),
 					}),
 				),
-				total: z.number().int(),
 			}),
 		)
 		.output(orderWithCustomerSchema)
 		.mutation(async ({ ctx, input }) => {
-			return placeOrder(ctx.user.id, {
-				customerId: input.customerId ?? null,
-				paymentMethodId: input.paymentMethodId,
-				products: input.products.map((p) => ({
-					product_id: p.id,
-					quantity: p.quantity,
-					price: p.price,
-				})),
-				total: input.total,
-			});
+			try {
+				return await placeOrder(ctx.user.id, {
+					customerId: input.customerId ?? null,
+					paymentMethodId: input.paymentMethodId,
+					products: input.products.map((p) => ({
+						product_id: p.id,
+						quantity: p.quantity,
+					})),
+				});
+			} catch (err) {
+				if (err instanceof OrderError) {
+					throw new TRPCError({
+						code: ORDER_ERROR_CODES[err.code],
+						message: err.message,
+					});
+				}
+				throw err;
+			}
 		}),
 
 	update: protectedProcedure

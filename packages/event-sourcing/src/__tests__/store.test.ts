@@ -173,4 +173,76 @@ describe("EventStore", () => {
 		});
 		expect(must(e0).occurredAt.toISOString()).toBe(when.toISOString());
 	});
+
+	it("appendMany escreve em vários streams em um só INSERT", async () => {
+		const stored = await store.appendMany<ProductEvent>(
+			[
+				{
+					streamType: "cart",
+					streamId: 1,
+					expectedVersion: 0,
+					events: [{ type: "ProductCreated", data: { name: "X", price: 1 } }],
+				},
+				{
+					streamType: "ledger",
+					streamId: 1,
+					expectedVersion: 0,
+					events: [
+						{ type: "ProductCreated", data: { name: "Y", price: 2 } },
+						{ type: "ProductPriceChanged", data: { price: 3 } },
+					],
+				},
+			],
+			{ userUid: "u9" },
+		);
+
+		const keys = stored.map(
+			(e) => `${e.streamType}:${e.streamId}:${e.version}`,
+		);
+		expect([...keys].sort()).toEqual(["cart:1:1", "ledger:1:1", "ledger:1:2"]);
+
+		const cart = await store.readStream<ProductEvent>("cart", 1);
+		const ledger = await store.readStream<ProductEvent>("ledger", 1);
+		expect(foldStream(cart, productReducer).state).toEqual({
+			name: "X",
+			price: 1,
+		});
+		expect(foldStream(ledger, productReducer).state).toEqual({
+			name: "Y",
+			price: 3,
+		});
+	});
+
+	it("appendMany é atômico: versão defasada rejeita o comando inteiro", async () => {
+		await store.append<ProductEvent>({
+			streamType: "atomic_b",
+			streamId: 1,
+			expectedVersion: 0,
+			userUid: "u10",
+			events: [{ type: "ProductCreated", data: { name: "B", price: 1 } }],
+		});
+
+		await expect(
+			store.appendMany<ProductEvent>(
+				[
+					{
+						streamType: "atomic_a",
+						streamId: 1,
+						expectedVersion: 0,
+						events: [{ type: "ProductCreated", data: { name: "A", price: 1 } }],
+					},
+					{
+						streamType: "atomic_b",
+						streamId: 1,
+						expectedVersion: 0, // defasada: atomic_b já está na versão 1
+						events: [{ type: "ProductPriceChanged", data: { price: 9 } }],
+					},
+				],
+				{ userUid: "u10" },
+			),
+		).rejects.toBeInstanceOf(ConcurrencyError);
+
+		// Nada foi gravado: o stream atomic_a continua vazio
+		expect(await store.readStream<ProductEvent>("atomic_a", 1)).toEqual([]);
+	});
 });

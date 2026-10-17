@@ -47,6 +47,19 @@ export interface AppendInput<TEvent extends DomainEvent = DomainEvent> {
 	occurredAt?: Date;
 }
 
+/**
+ * Um stream em um append multi-stream: comando que grava em mais de um
+ * agregado como um só fato (ex.: venda = pedido + baixa de estoque + pago).
+ * Todos os streams entram no mesmo INSERT, portanto tudo grava ou nada grava.
+ */
+export interface StreamAppend<TEvent extends DomainEvent = DomainEvent> {
+	streamType: string;
+	streamId: number;
+	/** Versão esperada do stream antes do append (0 = stream novo). */
+	expectedVersion: number;
+	events: TEvent[];
+}
+
 export interface ReadOptions {
 	/** Filtra por dono dos eventos. */
 	userUid?: string;
